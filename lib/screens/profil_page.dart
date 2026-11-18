@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
 import 'package:agrismart/models/zone.dart';
-import 'package:agrismart/screens/a_propos_page.dart'; // 👈 Le bouton du TP4
+import 'package:agrismart/screens/a_propos_page.dart';
 import 'package:agrismart/providers/auth_provider.dart';
 
 class ProfilPage extends StatelessWidget {
@@ -12,14 +12,22 @@ class ProfilPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final texte = Theme.of(context).textTheme;
 
-    // 🆕 Exercice 2 : Les 3 Select
-    final nombreZones = context.select<ZonesProvider, int>((p) => p.nombre);
-    final aIrriguer =
-    context.select<ZonesProvider, int>((p) => p.nombreAIrriguer);
-    final moyenne =
-    context.select<ZonesProvider, double>((p) => humiditeMoyenne(p.zones));
+    final nombreZones = context.select<ZonesProvider, int>(
+          (p) => p.nombre,
+    );
 
-    // TP6 : email de l'utilisateur connecté
+    final aIrriguer = context.select<ZonesProvider, int>(
+          (p) => p.nombreAIrriguer,
+    );
+
+    final moyenne = context.select<ZonesProvider, double>(
+          (p) => humiditeMoyenne(p.zones),
+    );
+
+    final nom = context.select<AuthProvider, String>(
+          (a) => a.utilisateur?.nom ?? '',
+    );
+
     final email = context.select<AuthProvider, String>(
           (a) => a.utilisateur?.email ?? '',
     );
@@ -33,19 +41,32 @@ class ProfilPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const SizedBox(height: 8),
+
+          // Avatar
           const Center(
             child: CircleAvatar(
               radius: 40,
               child: Icon(Icons.agriculture, size: 40),
             ),
           ),
+
           const SizedBox(height: 12),
+
+          // Nom de l'utilisateur connecté
           Center(
-            child: Text('Exploitation AgriSmart', style: texte.titleLarge),
+            child: Text(
+              nom,
+              style: texte.titleLarge,
+            ),
           ),
+
           const SizedBox(height: 4),
-          // ⚠️ Plus de const ici : email n'est pas une constante
-          Center(child: Text(email)),
+
+          // Email
+          Center(
+            child: Text(email),
+          ),
+
           const SizedBox(height: 16),
           const Divider(),
 
@@ -56,7 +77,7 @@ class ProfilPage extends StatelessWidget {
             trailing: Text('$nombreZones'),
           ),
 
-          // 🆕 Exercice 2 : Les deux nouvelles lignes
+          // Exercice 2 : Zones à irriguer
           ListTile(
             leading: const Icon(Icons.water_drop),
             title: const Text('Zones à irriguer'),
@@ -68,6 +89,8 @@ class ProfilPage extends StatelessWidget {
               ),
             ),
           ),
+
+          // Humidité moyenne
           ListTile(
             leading: const Icon(Icons.water),
             title: const Text('Humidité moyenne'),
@@ -76,7 +99,7 @@ class ProfilPage extends StatelessWidget {
 
           const Divider(),
 
-          // TP4 Oublié : Le bouton À propos
+          // TP4 : À propos
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('À propos'),
@@ -84,14 +107,16 @@ class ProfilPage extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const AProposPage()),
+                MaterialPageRoute(
+                  builder: (_) => const AProposPage(),
+                ),
               );
             },
           ),
 
           const Divider(),
 
-          // 🆕 TP6 : Déconnexion
+          // TP6 : Déconnexion
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Se déconnecter'),
@@ -102,7 +127,7 @@ class ProfilPage extends StatelessWidget {
     );
   }
 
-  // 🆕 TP6 : Confirmation avant déconnexion
+  // TP6 : Confirmation avant déconnexion
   Future<void> _confirmerDeconnexion(BuildContext context) async {
     final confirme = await showDialog<bool>(
       context: context,
@@ -123,7 +148,7 @@ class ProfilPage extends StatelessWidget {
 
     if (confirme != true || !context.mounted) return;
 
-    // AuthGate revient tout seul à l'écran de connexion
+    // AuthGate revient automatiquement à l'écran de connexion
     await context.read<AuthProvider>().deconnexion();
   }
 }

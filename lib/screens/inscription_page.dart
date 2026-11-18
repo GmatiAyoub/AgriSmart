@@ -13,13 +13,17 @@ class InscriptionPage extends StatefulWidget {
 
 class _InscriptionPageState extends State<InscriptionPage> {
   final _formKey = GlobalKey<FormState>();
+
+  final _nomCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _mdpCtrl = TextEditingController();
   final _confirmationCtrl = TextEditingController();
+
   bool _masquer = true;
 
   @override
   void dispose() {
+    _nomCtrl.dispose();
     _emailCtrl.dispose();
     _mdpCtrl.dispose();
     _confirmationCtrl.dispose();
@@ -28,13 +32,16 @@ class _InscriptionPageState extends State<InscriptionPage> {
 
   Future<void> _inscrire() async {
     if (!_formKey.currentState!.validate()) return;
+
     final ok = await context.read<AuthProvider>().inscription(
-      _emailCtrl.text,
+      _nomCtrl.text.trim(),
+      _emailCtrl.text.trim(),
       _mdpCtrl.text,
     );
+
     // Si l'inscription réussit, Firebase connecte automatiquement l'utilisateur.
-    // L'AuthGate se met à jour et prépare l'application... mais cet écran
-    // d'inscription est empilé par-dessus : il faut le retirer.
+    // L'AuthGate se met à jour, mais cet écran reste empilé :
+    // il faut donc le retirer.
     if (ok && mounted) {
       Navigator.pop(context);
     }
@@ -43,6 +50,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Créer un compte')),
       body: SafeArea(
@@ -59,6 +67,25 @@ class _InscriptionPageState extends State<InscriptionPage> {
                   children: [
                     const SizedBox(height: 8),
 
+                    // Champ Nom
+                    TextFormField(
+                      controller: _nomCtrl,
+                      keyboardType: TextInputType.name,
+                      decoration: const InputDecoration(
+                        labelText: 'Nom',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      validator: (valeur) {
+                        if (valeur == null || valeur.trim().isEmpty) {
+                          return 'Veuillez saisir votre nom';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
                     // Champ Email
                     TextFormField(
                       controller: _emailCtrl,
@@ -70,6 +97,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                       ),
                       validator: validerEmail,
                     ),
+
                     const SizedBox(height: 16),
 
                     // Champ Mot de passe
@@ -81,9 +109,11 @@ class _InscriptionPageState extends State<InscriptionPage> {
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(_masquer
-                              ? Icons.visibility
-                              : Icons.visibility_off),
+                          icon: Icon(
+                            _masquer
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
                           onPressed: () {
                             setState(() => _masquer = !_masquer);
                           },
@@ -91,6 +121,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                       ),
                       validator: validerMotDePasse,
                     ),
+
                     const SizedBox(height: 16),
 
                     // Champ Confirmation
@@ -106,9 +137,11 @@ class _InscriptionPageState extends State<InscriptionPage> {
                         if (valeur == null || valeur.isEmpty) {
                           return 'Confirmez le mot de passe';
                         }
+
                         if (valeur != _mdpCtrl.text) {
                           return 'Les mots de passe sont différents';
                         }
+
                         return null;
                       },
                     ),
@@ -119,7 +152,8 @@ class _InscriptionPageState extends State<InscriptionPage> {
                       Text(
                         auth.erreur!,
                         style: TextStyle(
-                            color: Theme.of(context).colorScheme.error),
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -133,7 +167,9 @@ class _InscriptionPageState extends State<InscriptionPage> {
                           ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
                       )
                           : const Text('Créer mon compte'),
                     ),

@@ -33,8 +33,8 @@ class AuthProvider extends ChangeNotifier {
     return _executer(() => _service.connexion(email, motDePasse));
   }
 
-  Future<bool> inscription(String email, String motDePasse) {
-    return _executer(() => _service.inscription(email, motDePasse));
+  Future<bool> inscription(String email, String motDePasse, String nom) {
+    return _executer(() => _service.inscription(email, motDePasse, nom));
   }
 
   Future<bool> reinitialiserMotDePasse(String email) {
@@ -46,6 +46,9 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> deconnexion() async {
     await _service.deconnexion();
     return true;
+  }
+  Future<bool> supprimerCompte() async {
+    return _executer(() => _service.supprimerCompte());
   }
 
   void effacerErreur() {

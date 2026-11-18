@@ -9,7 +9,11 @@ class FirebaseAuthService implements AuthService {
   Stream<Utilisateur?> get utilisateur {
     return _auth.authStateChanges().map((u) {
       if (u == null) return null;
-      return Utilisateur(uid: u.uid, email: u.email ?? '');
+      return Utilisateur(
+        uid: u.uid,
+        email: u.email ?? '',
+        nom: u.displayName ?? 'Exploitation AgriSmart',
+      );
     });
   }
 
@@ -22,14 +26,18 @@ class FirebaseAuthService implements AuthService {
   }
 
   @override
-  Future<void> inscription(String email, String motDePasse) {
-    return _executer(() => _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
-      password: motDePasse,
-    ));
+  Future<void> inscription(String email, String motDePasse, String nom) {
+    return _executer(() async {
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: motDePasse,
+);
+await credential.user?.updateDisplayName(nom);
+      await credential.user?.updateDisplayName(nom);
+    });
   }
 
-  @override
+@override
   Future<void> reinitialiserMotDePasse(String email) {
     return _executer(() => _auth.sendPasswordResetEmail(email: email.trim()));
   }
@@ -45,6 +53,15 @@ class FirebaseAuthService implements AuthService {
     } catch (_) {
       throw const AuthException('Une erreur est survenue');
     }
+  }
+  @override
+  Future<void> supprimerCompte() async {
+    await _executer(() async {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await user.delete();
+      }
+    });
   }
 
   String _traduire(String code) {

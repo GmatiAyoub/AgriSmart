@@ -9,7 +9,9 @@ abstract class AuthService {
   Stream<Utilisateur?> get utilisateur;
 
   Future<void> connexion(String email, String motDePasse);
-  Future<void> inscription(String email, String motDePasse);
+  Future<void> inscription(String email, String motDePasse,String nom);
   Future<void> reinitialiserMotDePasse(String email);
   Future<void> deconnexion();
+  Future<void> supprimerCompte();
+
 }
