@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
 import 'package:agrismart/models/zone.dart';
 import 'package:agrismart/screens/a_propos_page.dart'; // 👈 Le bouton du TP4
+import 'package:agrismart/providers/auth_provider.dart';
 
 class ProfilPage extends StatelessWidget {
   const ProfilPage({super.key});
@@ -13,8 +14,15 @@ class ProfilPage extends StatelessWidget {
 
     // 🆕 Exercice 2 : Les 3 Select
     final nombreZones = context.select<ZonesProvider, int>((p) => p.nombre);
-    final aIrriguer = context.select<ZonesProvider, int>((p) => p.nombreAIrriguer);
-    final moyenne = context.select<ZonesProvider, double>((p) => humiditeMoyenne(p.zones));
+    final aIrriguer =
+    context.select<ZonesProvider, int>((p) => p.nombreAIrriguer);
+    final moyenne =
+    context.select<ZonesProvider, double>((p) => humiditeMoyenne(p.zones));
+
+    // TP6 : email de l'utilisateur connecté
+    final email = context.select<AuthProvider, String>(
+          (a) => a.utilisateur?.email ?? '',
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -32,8 +40,12 @@ class ProfilPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Center(child: Text('Exploitation AgriSmart', style: texte.titleLarge)),
-          const Center(child: Text('Kébili, Tunisie')),
+          Center(
+            child: Text('Exploitation AgriSmart', style: texte.titleLarge),
+          ),
+          const SizedBox(height: 4),
+          // ⚠️ Plus de const ici : email n'est pas une constante
+          Center(child: Text(email)),
           const SizedBox(height: 16),
           const Divider(),
 
@@ -48,7 +60,13 @@ class ProfilPage extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.water_drop),
             title: const Text('Zones à irriguer'),
-            trailing: Text('$aIrriguer', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+            trailing: Text(
+              '$aIrriguer',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.water),
@@ -70,8 +88,42 @@ class ProfilPage extends StatelessWidget {
               );
             },
           ),
+
+          const Divider(),
+
+          // 🆕 TP6 : Déconnexion
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Se déconnecter'),
+            onTap: () => _confirmerDeconnexion(context),
+          ),
         ],
       ),
     );
+  }
+
+  // 🆕 TP6 : Confirmation avant déconnexion
+  Future<void> _confirmerDeconnexion(BuildContext context) async {
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Se déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Se déconnecter'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirme != true || !context.mounted) return;
+
+    // AuthGate revient tout seul à l'écran de connexion
+    await context.read<AuthProvider>().deconnexion();
   }
 }

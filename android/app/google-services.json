@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "726559935230",
+    "project_id": "agrismart-tp6",
+    "storage_bucket": "agrismart-tp6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:726559935230:android:336bdcfc9cd2cb25b473af",
+        "android_client_info": {
+          "package_name": "com.iset.agrismart"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUBi0ooaticfC93msgIk1S6kewDK27wg4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

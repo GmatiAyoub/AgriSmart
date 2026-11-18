@@ -1,14 +1,37 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:agrismart/config.dart';
+import 'package:agrismart/firebase_options.dart';
+import 'package:agrismart/providers/auth_provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
-import 'package:agrismart/screens/app_shell.dart';
+import 'package:agrismart/screens/auth_gate.dart';
+import 'package:agrismart/services/auth_locale_service.dart';
+import 'package:agrismart/services/auth_service.dart';
+import 'package:agrismart/services/firebase_auth_service.dart';
 import 'package:agrismart/theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final AuthService authService;
+
+  // C'est ICI que la magie opère
+  if (utiliserFirebase) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    authService = FirebaseAuthService();
+  } else {
+    authService = AuthLocaleService();
+  }
+
   runApp(
-    // 🔌 On branche le Provider tout en haut !
-    ChangeNotifierProvider(
-      create: (_) => ZonesProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider(authService)),
+        ChangeNotifierProvider(create: (_) => ZonesProvider()),
+      ],
       child: const AgriSmartApp(),
     ),
   );
@@ -21,10 +44,10 @@ class AgriSmartApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AgriSmart',
-      theme: ThemeData(colorSchemeSeed: Colors.green, useMaterial3: true),
-      // darkTheme: AppTheme.sombre(),
-      // themeMode: ThemeMode.system,
-      home: const AppShell(),
+      theme: AppTheme.clair(),
+      darkTheme: AppTheme.sombre(),
+      themeMode: ThemeMode.system,
+      home: const AuthGate(),
     );
   }
 }
