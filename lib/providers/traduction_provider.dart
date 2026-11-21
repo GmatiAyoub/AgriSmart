@@ -8,13 +8,30 @@ enum LangueApp { fr, ar }
 
 class TraductionProvider extends ChangeNotifier {
   final TraductionService _service;
-  TraductionProvider(this._service);
+
+  TraductionProvider(this._service) {
+    _detecterLangueSysteme();
+  }
 
   LangueApp _langueActuelle = LangueApp.fr;
   EtatTraduction _etat = EtatTraduction.initial;
   String _texteTraduit = '';
   String _erreur = '';
   bool _modelePret = false;
+
+  /// Détecte automatiquement la langue du téléphone au démarrage
+  void _detecterLangueSysteme() {
+    try {
+      final localeSysteme = WidgetsBinding.instance.platformDispatcher.locale;
+      if (localeSysteme.languageCode.toLowerCase().startsWith('ar')) {
+        _langueActuelle = LangueApp.ar;
+      } else {
+        _langueActuelle = LangueApp.fr;
+      }
+    } catch (_) {
+      _langueActuelle = LangueApp.fr;
+    }
+  }
 
   LangueApp get langueActuelle => _langueActuelle;
   bool get estArabe => _langueActuelle == LangueApp.ar;
