@@ -10,6 +10,7 @@ import 'package:agrismart/services/auth_locale_service.dart';
 import 'package:agrismart/services/auth_service.dart';
 import 'package:agrismart/services/firebase_auth_service.dart';
 import 'package:agrismart/theme/app_theme.dart';
+import 'package:agrismart/providers/meteo_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +32,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider(authService)),
         ChangeNotifierProvider(create: (_) => ZonesProvider()),
+        ChangeNotifierProvider(create: (_) => MeteoProvider()..charger()),
       ],
       child: const AgriSmartApp(),
     ),
