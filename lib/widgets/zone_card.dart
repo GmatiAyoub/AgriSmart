@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:agrismart/models/zone.dart';
+import 'package:agrismart/providers/traduction_provider.dart';
 
 class ZoneCard extends StatelessWidget {
   final Zone zone;
   final VoidCallback onAugmenter;
   final VoidCallback onDiminuer;
   final VoidCallback? onTap;
-  final VoidCallback? onLongPress; // 👈 C'est cette ligne qui manque !
+  final VoidCallback? onLongPress;
 
   const ZoneCard({
     super.key,
@@ -14,11 +16,12 @@ class ZoneCard extends StatelessWidget {
     required this.onAugmenter,
     required this.onDiminuer,
     this.onTap,
-    this.onLongPress, // 👈 Et celle-ci !
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
+    final traduction = context.watch<TraductionProvider>();
     final couleur = zone.besoinIrrigation ? Colors.red : Colors.green;
 
     return Card(
@@ -26,7 +29,7 @@ class ZoneCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        onLongPress: onLongPress, // 👈 Et enfin celle-ci dans l'InkWell
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -47,7 +50,9 @@ class ZoneCard extends StatelessWidget {
                   children: [
                     Text(zone.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
                     Text(
-                      zone.besoinIrrigation ? "Besoin d'irrigation" : "Sol correct",
+                      zone.besoinIrrigation
+                          ? traduction.tr('besoinIrrigation')
+                          : traduction.tr('solCorrect'),
                       style: TextStyle(color: couleur, fontSize: 12),
                     ),
                     LinearProgressIndicator(

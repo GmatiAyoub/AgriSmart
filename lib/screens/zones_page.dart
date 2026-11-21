@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agrismart/models/zone.dart';
 import 'package:agrismart/providers/zones_provider.dart';
+import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/screens/zone_detail_page.dart';
 import 'package:agrismart/screens/zone_form_page.dart';
 import 'package:agrismart/widgets/fiche_exploitation.dart';
@@ -16,6 +17,7 @@ class ZonesPage extends StatelessWidget {
   }
 
   Future<void> _ajouter(BuildContext context) async {
+    final traduction = context.read<TraductionProvider>();
     final noms = context.read<ZonesProvider>().noms();
     final nouvelle = await Navigator.push<Zone>(
       context,
@@ -23,10 +25,11 @@ class ZonesPage extends StatelessWidget {
     );
     if (nouvelle == null || !context.mounted) return;
     context.read<ZonesProvider>().ajouter(nouvelle);
-    _message(context, 'Zone ajoutée');
+    _message(context, traduction.tr('zoneAjoutee'));
   }
 
   Future<void> _ouvrirDetail(BuildContext context, Zone zone) async {
+    final traduction = context.read<TraductionProvider>();
     final noms = context.read<ZonesProvider>().noms(sauf: zone);
     final modifiee = await Navigator.push<Zone>(
       context,
@@ -36,24 +39,25 @@ class ZonesPage extends StatelessWidget {
     );
     if (modifiee == null || !context.mounted) return;
     context.read<ZonesProvider>().remplacer(zone, modifiee);
-    _message(context, 'Zone modifiée');
+    _message(context, traduction.tr('zoneModifiee'));
   }
 
   Future<void> _confirmerSuppression(BuildContext context, Zone zone) async {
+    final traduction = context.read<TraductionProvider>();
     final confirme = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer la zone ?'),
-        content: Text('La zone ${zone.nom} sera supprimée définitivement.'),
+        title: Text(traduction.tr('supprimerZone')),
+        content: Text(zone.nom),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Supprimer')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(traduction.tr('annuler'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(traduction.tr('supprimer'))),
         ],
       ),
     );
     if (confirme != true || !context.mounted) return;
     context.read<ZonesProvider>().supprimer(zone);
-    _message(context, 'Zone supprimée');
+    _message(context, traduction.tr('zoneSupprimee'));
   }
 
   Widget _carte(BuildContext context, Zone zone) {
@@ -71,14 +75,21 @@ class ZonesPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final zonesAffichees = context.watch<ZonesProvider>().zonesAffichees;
     final toutesLesZones = context.watch<ZonesProvider>().zones;
-    final filtreActif = context.watch<ZonesProvider>().seulementAIrriguer; // 🆕
+    final filtreActif = context.watch<ZonesProvider>().seulementAIrriguer;
+    final traduction = context.watch<TraductionProvider>();
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('AgriSmart'),
+        title: Text(traduction.tr('appTitle')),
         actions: [
-          // 🆕 Exercice 1 : Le bouton de filtre
+          // Bouton de bascule de langue (FR <-> AR)
+          ActionChip(
+            avatar: const Icon(Icons.language, size: 18),
+            label: Text(traduction.estArabe ? 'FR' : 'عربي'),
+            onPressed: () => context.read<TraductionProvider>().basculerLangue(),
+          ),
+          const SizedBox(width: 8),
           IconButton(
             icon: Icon(filtreActif ? Icons.filter_alt : Icons.filter_alt_off),
             onPressed: () => context.read<ZonesProvider>().basculerFiltre(),
@@ -91,12 +102,11 @@ class ZonesPage extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // La fiche utilise TOUTES les zones pour la moyenne
           FicheExploitation(humiditeMoyenne: humiditeMoyenne(toutesLesZones)),
           ResumeExploitation(zones: toutesLesZones),
           Expanded(
             child: zonesAffichees.isEmpty
-                ? const Center(child: Text('Aucune zone pour le moment'))
+                ? Center(child: Text(traduction.tr('aucuneZone')))
                 : LayoutBuilder(
               builder: (context, constraints) {
                 if (constraints.maxWidth >= 600) {

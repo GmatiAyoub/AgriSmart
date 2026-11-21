@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:agrismart/models/zone.dart';
+import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/screens/zone_form_page.dart';
 import 'package:agrismart/theme/app_theme.dart';
 
 class ZoneDetailPage extends StatelessWidget {
  final Zone zone;
- // Noms des autres zones, pour refuser un doublon lors de la modification
  final List<String> nomsAutres;
 
  const ZoneDetailPage({
@@ -14,7 +15,6 @@ class ZoneDetailPage extends StatelessWidget {
   this.nomsAutres = const [],
  });
 
- // TODO 1 : Ouvrir le formulaire d'édition et renvoyer le résultat
  Future<void> _modifier(BuildContext context) async {
   final nouvelle = await Navigator.push<Zone>(
    context,
@@ -26,19 +26,14 @@ class ZoneDetailPage extends StatelessWidget {
    ),
   );
 
-  // Si l'utilisateur annule, ou que l'écran n'existe plus
   if (nouvelle == null || !context.mounted) return;
-
-  // Si on a une nouvelle zone, on ferme cette fiche
-  // et on renvoie la zone modifiée à la page principale
   Navigator.pop(context, nouvelle);
  }
 
  @override
  Widget build(BuildContext context) {
+  final traduction = context.watch<TraductionProvider>();
   final couleur = zone.besoinIrrigation ? AppTheme.echec : AppTheme.succes;
-
-  // Sécurité pour les noms courts (ex: "Blé")
   final longueur = zone.culture.length < 4 ? zone.culture.length : 4;
   final texte = Theme.of(context).textTheme;
 
@@ -49,7 +44,6 @@ class ZoneDetailPage extends StatelessWidget {
    body: ListView(
     padding: const EdgeInsets.all(16),
     children: [
-     // TODO 2 : En-tête (Avatar + Nom + Culture)
      Row(
       children: [
        CircleAvatar(
@@ -74,7 +68,6 @@ class ZoneDetailPage extends StatelessWidget {
      ),
      const SizedBox(height: 32),
 
-     // TODO 3 : Humidité en grand et barre de progression
      Center(
       child: Text(
        '${zone.humidite.toStringAsFixed(0)} %',
@@ -94,7 +87,7 @@ class ZoneDetailPage extends StatelessWidget {
      const SizedBox(height: 16),
      Center(
       child: Text(
-       zone.besoinIrrigation ? "Besoin d'irrigation" : "Sol correct",
+       zone.besoinIrrigation ? traduction.tr('besoinIrrigation') : traduction.tr('solCorrect'),
        style: TextStyle(
            color: couleur,
            fontSize: 18,
@@ -104,20 +97,19 @@ class ZoneDetailPage extends StatelessWidget {
      ),
      const SizedBox(height: 32),
 
-     // TODO 4 : Carte des détails
      Card(
       elevation: 2,
       child: Column(
        children: [
         ListTile(
          leading: const Icon(Icons.water_drop),
-         title: const Text('Humidité actuelle'),
+         title: Text(traduction.tr('humActuelle')),
          trailing: Text('${zone.humidite.toStringAsFixed(0)} %'),
         ),
         const Divider(height: 1),
         ListTile(
          leading: const Icon(Icons.flag),
-         title: const Text("Seuil d'irrigation"),
+         title: Text(traduction.tr('seuilIrrigation')),
          trailing: Text('${zone.seuil.toStringAsFixed(0)} %'),
         ),
         const Divider(height: 1),
@@ -126,19 +118,18 @@ class ZoneDetailPage extends StatelessWidget {
           zone.vanneOuverte ? Icons.toggle_on : Icons.toggle_off,
           color: zone.vanneOuverte ? Colors.green : Colors.grey,
          ),
-         title: const Text('Vanne'),
-         trailing: Text(zone.vanneOuverte ? 'Ouverte' : 'Fermée'),
+         title: Text(traduction.tr('vanne')),
+         trailing: Text(zone.vanneOuverte ? traduction.tr('ouverte') : traduction.tr('fermee')),
         ),
        ],
       ),
      ),
      const SizedBox(height: 32),
 
-     // Bouton pour lancer la modification
      FilledButton.icon(
       onPressed: () => _modifier(context),
       icon: const Icon(Icons.edit),
-      label: const Text('Modifier cette zone'),
+      label: Text(traduction.tr('modifierCetteZone')),
       style: FilledButton.styleFrom(
        padding: const EdgeInsets.symmetric(vertical: 16),
       ),

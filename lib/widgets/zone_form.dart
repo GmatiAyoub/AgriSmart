@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:agrismart/models/zone.dart';
+import 'package:agrismart/providers/traduction_provider.dart';
 
 class ZoneForm extends StatefulWidget {
   final Zone? zone;
   final void Function(Zone) onEnregistrer;
-  final List<String> nomsExistants; // 🆕 Exercice 1
+  final List<String> nomsExistants;
 
   const ZoneForm({
     super.key,
     this.zone,
     required this.onEnregistrer,
-    required this.nomsExistants, // 🆕 Exercice 1
+    required this.nomsExistants,
   });
 
   @override
@@ -61,13 +63,11 @@ class _ZoneFormState extends State<ZoneForm> {
     return null;
   }
 
-  // 🆕 Exercice 1 : Validateur spécial pour le nom (vérifie les doublons)
   String? _validatorNom(String? valeur) {
     final erreurBase = _validatorTexte(valeur);
     if (erreurBase != null) return erreurBase;
 
     final nomSaisi = valeur!.trim().toLowerCase();
-    // On vérifie si le nom existe déjà (en ignorant les majuscules)
     final existeDeja = widget.nomsExistants
         .map((n) => n.toLowerCase())
         .contains(nomSaisi);
@@ -113,6 +113,8 @@ class _ZoneFormState extends State<ZoneForm> {
 
   @override
   Widget build(BuildContext context) {
+    final traduction = context.watch<TraductionProvider>();
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Form(
@@ -122,25 +124,25 @@ class _ZoneFormState extends State<ZoneForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              _modeEdition ? 'Modifier la zone' : 'Nouvelle zone',
+              _modeEdition ? traduction.tr('modifierZone') : traduction.tr('nouvelleZone'),
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _nomCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Nom de la zone',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: traduction.tr('nomZone'),
+                border: const OutlineInputBorder(),
               ),
               textInputAction: TextInputAction.next,
-              validator: _validatorNom, // 🆕 Utilisation du nouveau validateur
+              validator: _validatorNom,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _cultureCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Culture',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: traduction.tr('culture'),
+                border: const OutlineInputBorder(),
               ),
               textInputAction: TextInputAction.next,
               validator: _validatorTexte,
@@ -165,9 +167,9 @@ class _ZoneFormState extends State<ZoneForm> {
                 Expanded(
                   child: TextFormField(
                     controller: _seuilCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Seuil (%)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: traduction.tr('seuilPercent'),
+                      border: const OutlineInputBorder(),
                     ),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     validator: _validatorPourcentage,
@@ -178,7 +180,7 @@ class _ZoneFormState extends State<ZoneForm> {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _soumettre,
-              child: Text(_modeEdition ? 'Enregistrer' : 'Ajouter'),
+              child: Text(_modeEdition ? traduction.tr('enregistrer') : traduction.tr('enregistrer')),
             ),
           ],
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
+import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/models/zone.dart';
 import 'package:agrismart/screens/a_propos_page.dart';
 import 'package:agrismart/providers/auth_provider.dart';
@@ -11,6 +12,7 @@ class ProfilPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final texte = Theme.of(context).textTheme;
+    final traduction = context.watch<TraductionProvider>();
 
     final nombreZones = context.select<ZonesProvider, int>(
           (p) => p.nombre,
@@ -35,14 +37,13 @@ class ProfilPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Profil'),
+        title: Text(traduction.tr('profil')),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           const SizedBox(height: 8),
 
-          // Avatar
           const Center(
             child: CircleAvatar(
               radius: 40,
@@ -52,7 +53,6 @@ class ProfilPage extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // Nom de l'utilisateur connecté
           Center(
             child: Text(
               nom,
@@ -62,7 +62,6 @@ class ProfilPage extends StatelessWidget {
 
           const SizedBox(height: 4),
 
-          // Email
           Center(
             child: Text(email),
           ),
@@ -70,17 +69,36 @@ class ProfilPage extends StatelessWidget {
           const SizedBox(height: 16),
           const Divider(),
 
-          // TP5 : Nombre de zones
+          // Sélecteur de langue
+          ListTile(
+            leading: const Icon(Icons.language),
+            title: const Text('Langue / اللغة'),
+            subtitle: Text(traduction.estArabe ? 'العربية' : 'Français'),
+            trailing: SegmentedButton<LangueApp>(
+              segments: const [
+                ButtonSegment(value: LangueApp.fr, label: Text('FR')),
+                ButtonSegment(value: LangueApp.ar, label: Text('عربي')),
+              ],
+              selected: {traduction.langueActuelle},
+              onSelectionChanged: (set) {
+                if (set.isNotEmpty) {
+                  context.read<TraductionProvider>().fixerLangue(set.first);
+                }
+              },
+            ),
+          ),
+
+          const Divider(),
+
           ListTile(
             leading: const Icon(Icons.grass),
-            title: const Text('Zones suivies'),
+            title: Text(traduction.tr('zonesSuivies')),
             trailing: Text('$nombreZones'),
           ),
 
-          // Exercice 2 : Zones à irriguer
           ListTile(
             leading: const Icon(Icons.water_drop),
-            title: const Text('Zones à irriguer'),
+            title: Text(traduction.tr('zonesAIrriguer')),
             trailing: Text(
               '$aIrriguer',
               style: const TextStyle(
@@ -90,19 +108,17 @@ class ProfilPage extends StatelessWidget {
             ),
           ),
 
-          // Humidité moyenne
           ListTile(
             leading: const Icon(Icons.water),
-            title: const Text('Humidité moyenne'),
+            title: Text(traduction.tr('humiditeMoyenne')),
             trailing: Text('${moyenne.toStringAsFixed(1)} %'),
           ),
 
           const Divider(),
 
-          // TP4 : À propos
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('À propos'),
+            title: Text(traduction.tr('aPropos')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
@@ -116,10 +132,9 @@ class ProfilPage extends StatelessWidget {
 
           const Divider(),
 
-          // TP6 : Déconnexion
           ListTile(
             leading: const Icon(Icons.logout),
-            title: const Text('Se déconnecter'),
+            title: Text(traduction.tr('seDeconnecter')),
             onTap: () => _confirmerDeconnexion(context),
           ),
         ],
@@ -127,20 +142,20 @@ class ProfilPage extends StatelessWidget {
     );
   }
 
-  // TP6 : Confirmation avant déconnexion
   Future<void> _confirmerDeconnexion(BuildContext context) async {
+    final traduction = context.read<TraductionProvider>();
     final confirme = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Se déconnecter ?'),
+        title: Text(traduction.tr('confirmerDeconnexion')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Annuler'),
+            child: Text(traduction.tr('annuler')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Se déconnecter'),
+            child: Text(traduction.tr('seDeconnecter')),
           ),
         ],
       ),
@@ -148,7 +163,6 @@ class ProfilPage extends StatelessWidget {
 
     if (confirme != true || !context.mounted) return;
 
-    // AuthGate revient automatiquement à l'écran de connexion
     await context.read<AuthProvider>().deconnexion();
   }
 }

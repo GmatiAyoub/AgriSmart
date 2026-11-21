@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agrismart/providers/auth_provider.dart';
+import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/screens/connexion_page.dart'
     show validerEmail, validerMotDePasse;
 
@@ -39,9 +40,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
       _mdpCtrl.text,
     );
 
-    // Si l'inscription réussit, Firebase connecte automatiquement l'utilisateur.
-    // L'AuthGate se met à jour, mais cet écran reste empilé :
-    // il faut donc le retirer.
     if (ok && mounted) {
       Navigator.pop(context);
     }
@@ -50,9 +48,10 @@ class _InscriptionPageState extends State<InscriptionPage> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final traduction = context.watch<TraductionProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Créer un compte')),
+      appBar: AppBar(title: Text(traduction.tr('inscription'))),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -67,14 +66,13 @@ class _InscriptionPageState extends State<InscriptionPage> {
                   children: [
                     const SizedBox(height: 8),
 
-                    // Champ Nom
                     TextFormField(
                       controller: _nomCtrl,
                       keyboardType: TextInputType.name,
-                      decoration: const InputDecoration(
-                        labelText: 'Nom',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person_outline),
+                      decoration: InputDecoration(
+                        labelText: traduction.tr('nom'),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.person_outline),
                       ),
                       validator: (valeur) {
                         if (valeur == null || valeur.trim().isEmpty) {
@@ -86,26 +84,24 @@ class _InscriptionPageState extends State<InscriptionPage> {
 
                     const SizedBox(height: 16),
 
-                    // Champ Email
                     TextFormField(
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.email_outlined),
+                      decoration: InputDecoration(
+                        labelText: traduction.tr('email'),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.email_outlined),
                       ),
                       validator: validerEmail,
                     ),
 
                     const SizedBox(height: 16),
 
-                    // Champ Mot de passe
                     TextFormField(
                       controller: _mdpCtrl,
                       obscureText: _masquer,
                       decoration: InputDecoration(
-                        labelText: 'Mot de passe',
+                        labelText: traduction.tr('motDePasse'),
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
@@ -124,14 +120,13 @@ class _InscriptionPageState extends State<InscriptionPage> {
 
                     const SizedBox(height: 16),
 
-                    // Champ Confirmation
                     TextFormField(
                       controller: _confirmationCtrl,
                       obscureText: _masquer,
-                      decoration: const InputDecoration(
-                        labelText: 'Confirmer le mot de passe',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.lock_outline),
+                      decoration: InputDecoration(
+                        labelText: traduction.tr('confirmerMotDePasse'),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock_outline),
                       ),
                       validator: (valeur) {
                         if (valeur == null || valeur.isEmpty) {
@@ -146,7 +141,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
                       },
                     ),
 
-                    // Affichage de l'erreur du provider
                     if (auth.erreur != null) ...[
                       const SizedBox(height: 12),
                       Text(
@@ -160,7 +154,6 @@ class _InscriptionPageState extends State<InscriptionPage> {
 
                     const SizedBox(height: 16),
 
-                    // Bouton Créer mon compte
                     FilledButton(
                       onPressed: auth.occupe ? null : _inscrire,
                       child: auth.occupe
@@ -171,7 +164,7 @@ class _InscriptionPageState extends State<InscriptionPage> {
                           strokeWidth: 2,
                         ),
                       )
-                          : const Text('Créer mon compte'),
+                          : Text(traduction.tr('creerMonCompte')),
                     ),
                   ],
                 ),

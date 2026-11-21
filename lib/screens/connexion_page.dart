@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agrismart/providers/auth_provider.dart';
+import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/screens/inscription_page.dart';
 
-// Validations partagées par les écrans de connexion et d'inscription.
 String? validerEmail(String? valeur) {
   final v = (valeur ?? '').trim();
   if (v.isEmpty) return "L'email est obligatoire";
@@ -41,15 +41,14 @@ class _ConnexionPageState extends State<ConnexionPage> {
   Future<void> _connecter() async {
     if (!_formKey.currentState!.validate()) return;
     await context.read<AuthProvider>().connexion(_emailCtrl.text, _mdpCtrl.text);
-    // En cas de succès, l'AuthGate se met à jour tout seul :
-    // rien d'autre à faire ici.
   }
 
   Future<void> _motDePasseOublie() async {
+    final traduction = context.read<TraductionProvider>();
     final email = _emailCtrl.text;
     if (validerEmail(email) != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Saisissez d'abord votre email")),
+        SnackBar(content: Text(traduction.tr('saisirEmail'))),
       );
       return;
     }
@@ -57,14 +56,26 @@ class _ConnexionPageState extends State<ConnexionPage> {
     await context.read<AuthProvider>().reinitialiserMotDePasse(email);
     if (!ok || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Email de réinitialisation envoyé')),
+      SnackBar(content: Text(traduction.tr('emailEnvoye'))),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final traduction = context.watch<TraductionProvider>();
+
     return Scaffold(
+      appBar: AppBar(
+        actions: [
+          ActionChip(
+            avatar: const Icon(Icons.language, size: 18),
+            label: Text(traduction.estArabe ? 'FR' : 'عربي'),
+            onPressed: () => context.read<TraductionProvider>().basculerLangue(),
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -86,25 +97,23 @@ class _ConnexionPageState extends State<ConnexionPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Champ Email
                     TextFormField(
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.email_outlined),
+                      decoration: InputDecoration(
+                        labelText: traduction.tr('email'),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.email_outlined),
                       ),
                       validator: validerEmail,
                     ),
                     const SizedBox(height: 16),
 
-                    // Champ Mot de passe
                     TextFormField(
                       controller: _mdpCtrl,
                       obscureText: _masquer,
                       decoration: InputDecoration(
-                        labelText: 'Mot de passe',
+                        labelText: traduction.tr('motDePasse'),
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
@@ -119,7 +128,6 @@ class _ConnexionPageState extends State<ConnexionPage> {
                       validator: validerMotDePasse,
                     ),
 
-                    // Affichage de l'erreur du provider
                     if (auth.erreur != null) ...[
                       const SizedBox(height: 12),
                       Text(
@@ -131,7 +139,6 @@ class _ConnexionPageState extends State<ConnexionPage> {
 
                     const SizedBox(height: 16),
 
-                    // Bouton Se connecter
                     FilledButton(
                       onPressed: auth.occupe ? null : _connecter,
                       child: auth.occupe
@@ -140,12 +147,12 @@ class _ConnexionPageState extends State<ConnexionPage> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                          : const Text('Se connecter'),
+                          : Text(traduction.tr('connexion')),
                     ),
 
                     TextButton(
                       onPressed: auth.occupe ? null : _motDePasseOublie,
-                      child: const Text('Mot de passe oublié ?'),
+                      child: Text(traduction.tr('motDePasseOublie')),
                     ),
 
                     TextButton(
@@ -160,7 +167,7 @@ class _ConnexionPageState extends State<ConnexionPage> {
                           ),
                         );
                       },
-                      child: const Text("Pas de compte ? S'inscrire"),
+                      child: Text(traduction.tr('pasDeCompte')),
                     ),
                   ],
                 ),

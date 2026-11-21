@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 import 'package:agrismart/models/meteo.dart';
 import 'package:agrismart/providers/meteo_provider.dart';
+import 'package:agrismart/providers/traduction_provider.dart';
 
 class MeteoCard extends StatelessWidget {
   const MeteoCard({super.key});
@@ -9,18 +11,19 @@ class MeteoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MeteoProvider>();
+    final traduction = context.watch<TraductionProvider>();
     final Widget contenu;
 
     switch (provider.etat) {
       case EtatMeteo.chargement:
-        contenu = const Padding(
-          padding: EdgeInsets.all(24),
+        contenu = Padding(
+          padding: const EdgeInsets.all(24),
           child: Center(
             child: Column(
               children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 12),
-                Text('Chargement de la météo...'),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 12),
+                Text(traduction.tr('chargementMeteo')),
               ],
             ),
           ),
@@ -36,7 +39,7 @@ class MeteoCard extends StatelessWidget {
               const SizedBox(height: 8),
               FilledButton.tonal(
                 onPressed: () => context.read<MeteoProvider>().charger(),
-                child: const Text('Réessayer'),
+                child: Text(traduction.tr('reessayer')),
               ),
             ],
           ),
@@ -57,23 +60,32 @@ class _Contenu extends StatelessWidget {
   final Meteo meteo;
   const _Contenu({required this.meteo});
 
-  // On garde ce tableau en secours au cas où
-  static const _jours = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+  static const _joursFr = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+  static const _joursAr = ['إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت', 'أحد'];
 
   @override
   Widget build(BuildContext context) {
+    final traduction = context.watch<TraductionProvider>();
     final texte = Theme.of(context).textTheme;
     final pluie = meteo.pluieTotale;
-    final conseil = pluie >= 5
-        ? 'Pluie prévue (${pluie.toStringAsFixed(1)} mm) : repoussez l\'irrigation'
-        : 'Pas de pluie significative prévue';
+
+    final String conseil;
+    if (traduction.estArabe) {
+      conseil = pluie >= 5
+          ? 'أمطار متوقعة (${pluie.toStringAsFixed(1)} مم) : تأجيل الري'
+          : 'لا توجد أمطار هامة متوقعة';
+    } else {
+      conseil = pluie >= 5
+          ? 'Pluie prévue (${pluie.toStringAsFixed(1)} mm) : repoussez l\'irrigation'
+          : 'Pas de pluie significative prévue';
+    }
 
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Météo à Kébili', style: texte.titleMedium),
+          Text(traduction.tr('meteoKebili'), style: texte.titleMedium),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -85,8 +97,8 @@ class _Contenu extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text("Humidité de l'air : ${meteo.humiditeAir} %"),
-                  Text('Vent : ${meteo.vent.toStringAsFixed(0)} km/h'),
+                  Text("${traduction.tr('humiditeAir')} : ${meteo.humiditeAir} %"),
+                  Text("${traduction.tr('vent')} : ${meteo.vent.toStringAsFixed(0)} km/h"),
                 ],
               ),
             ],
@@ -97,29 +109,26 @@ class _Contenu extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 children: [
-                  // 👇 MODIFICATION ICI : L'exercice "Aller plus loin"
                   SizedBox(
-                    width: 85, // Élargi pour faire rentrer "Après-demain"
+                    width: 95,
                     child: Text(
-                          () {
-                        // On compare uniquement les dates (sans les heures)
+                      () {
                         final maintenant = DateTime.now();
                         final aujourdhui = DateTime(maintenant.year, maintenant.month, maintenant.day);
                         final datePrevision = DateTime(p.date.year, p.date.month, p.date.day);
 
                         final difference = datePrevision.difference(aujourdhui).inDays;
 
-                        if (difference == 0) return "Aujourd'hui";
-                        if (difference == 1) return 'Demain';
-                        if (difference == 2) return 'Après-demain';
+                        if (difference == 0) return traduction.tr('aujourdhui');
+                        if (difference == 1) return traduction.tr('demain');
+                        if (difference == 2) return traduction.tr('apresDemain');
 
-                        // Au cas où (ex: si l'API renvoie plus de 3 jours)
-                        return _jours[p.date.weekday - 1];
+                        final index = p.date.weekday - 1;
+                        return traduction.estArabe ? _joursAr[index] : _joursFr[index];
                       }(),
-                      style: const TextStyle(fontSize: 13), // Police un peu plus petite
+                      style: const TextStyle(fontSize: 13),
                     ),
                   ),
-                  // 👆 FIN DE LA MODIFICATION
 
                   Expanded(
                     child: Text(
@@ -133,7 +142,76 @@ class _Contenu extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 8),
-          Text(conseil, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(conseil, style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.translate, color: Colors.green),
+                tooltip: traduction.tr('traduireArabe'),
+                onPressed: () {
+                  context.read<TraductionProvider>().traduire(
+                        conseil,
+                        TranslateLanguage.french,
+                        TranslateLanguage.arabic,
+                      );
+                },
+              ),
+            ],
+          ),
+          Consumer<TraductionProvider>(
+            builder: (context, trad, _) {
+              if (trad.etat == EtatTraduction.traductionEnCours) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(trad.tr('traductionEnCours'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                );
+              }
+              if (trad.etat == EtatTraduction.succes && trad.texteTraduit.isNotEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      trad.texteTraduit,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                        fontSize: 14,
+                      ),
+                      textDirection: TextDirection.rtl,
+                    ),
+                  ),
+                );
+              }
+              if (trad.etat == EtatTraduction.erreur && trad.erreur.isNotEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    trad.erreur,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
         ],
       ),
     );
