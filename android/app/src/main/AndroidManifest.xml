@@ -3,6 +3,9 @@
 
     <!-- 👇 Permission indispensable pour les appels API (TP 7) -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Scan QR / codes-barres -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
     <application
         android:label="agrismart"

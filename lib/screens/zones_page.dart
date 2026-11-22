@@ -4,6 +4,7 @@ import 'package:agrismart/models/zone.dart';
 import 'package:agrismart/providers/zones_provider.dart';
 import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/screens/diagnostic_page.dart';
+import 'package:agrismart/screens/scan_page.dart';
 import 'package:agrismart/screens/zone_detail_page.dart';
 import 'package:agrismart/screens/zone_form_page.dart';
 import 'package:agrismart/widgets/fiche_exploitation.dart';
@@ -91,6 +92,14 @@ class ZonesPage extends StatelessWidget {
             onPressed: () => context.read<TraductionProvider>().basculerLangue(),
           ),
           const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: traduction.tr('scanTitre'),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ScanPage()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.eco_outlined),
             tooltip: traduction.tr('diagTitre'),

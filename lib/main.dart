@@ -5,6 +5,7 @@ import 'package:google_mlkit_translation/google_mlkit_translation.dart'; // 👈
 import 'package:agrismart/config.dart';
 import 'package:agrismart/firebase_options.dart';
 import 'package:agrismart/providers/auth_provider.dart';
+import 'package:agrismart/providers/interventions_provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
 import 'package:agrismart/providers/traduction_provider.dart'; // 👈 Ajout Provider
 import 'package:agrismart/screens/auth_gate.dart';
@@ -38,6 +39,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider(authService)),
         ChangeNotifierProvider(create: (_) => ZonesProvider()),
+        ChangeNotifierProvider(create: (_) => InterventionsProvider()),
         ChangeNotifierProvider(create: (_) => MeteoProvider()..charger()),
 
         // 👇 Ajout du Provider de traduction
