@@ -184,6 +184,16 @@ class TraductionProvider extends ChangeNotifier {
     'culture': 'Culture',
     'seuilPercent': "Seuil d'irrigation (%)",
     'enregistrer': 'Enregistrer',
+
+    // Stockage local / thème / cache météo
+    'theme': 'Thème',
+    'themeSysteme': 'Système',
+    'themeClair': 'Clair',
+    'themeSombre': 'Sombre',
+    'miseAJourLe': 'Mis à jour le',
+    'horsLigneDu': 'Hors ligne : données du',
+    'donneesHorsLigne': 'Données hors ligne',
+    'a': 'à',
   };
 
   static const Map<String, String> _dicoArabe = {
@@ -310,6 +320,16 @@ class TraductionProvider extends ChangeNotifier {
     'culture': 'المحصول',
     'seuilPercent': 'عتبة الري (%)',
     'enregistrer': 'حفظ',
+
+    // Stockage local / thème / cache météo
+    'theme': 'المظهر',
+    'themeSysteme': 'النظام',
+    'themeClair': 'فاتح',
+    'themeSombre': 'داكن',
+    'miseAJourLe': 'آخر تحديث في',
+    'horsLigneDu': 'غير متصل : بيانات',
+    'donneesHorsLigne': 'بيانات غير متصلة',
+    'a': 'على الساعة',
   };
 
   /// Méthodes ML Kit dynamiques

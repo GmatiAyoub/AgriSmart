@@ -1,7 +1,9 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
 import 'package:agrismart/providers/traduction_provider.dart';
+import 'package:agrismart/providers/reglages_provider.dart';
 import 'package:agrismart/models/zone.dart';
 import 'package:agrismart/screens/a_propos_page.dart';
 import 'package:agrismart/providers/auth_provider.dart';
@@ -24,6 +26,11 @@ class ProfilPage extends StatelessWidget {
 
     final moyenne = context.select<ZonesProvider, double>(
           (p) => humiditeMoyenne(p.zones),
+    );
+
+    // Récupération du thème actuel
+    final themeMode = context.select<ReglagesProvider, ThemeMode>(
+          (r) => r.themeMode,
     );
 
     final nom = context.select<AuthProvider, String>(
@@ -90,6 +97,40 @@ class ProfilPage extends StatelessWidget {
 
           const Divider(),
 
+          // Choix du thème (enregistré sur l'appareil)
+          ListTile(
+            leading: const Icon(Icons.brightness_6),
+            title: Text(traduction.tr('theme')),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SegmentedButton<ThemeMode>(
+              segments: [
+                ButtonSegment(
+                  value: ThemeMode.system,
+                  label: Text(traduction.tr('themeSysteme')),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.light,
+                  label: Text(traduction.tr('themeClair')),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.dark,
+                  label: Text(traduction.tr('themeSombre')),
+                ),
+              ],
+              selected: {themeMode},
+              onSelectionChanged: (choix) {
+                context.read<ReglagesProvider>().changerTheme(choix.first);
+              },
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          const Divider(),
+
           ListTile(
             leading: const Icon(Icons.grass),
             title: Text(traduction.tr('zonesSuivies')),
@@ -144,6 +185,7 @@ class ProfilPage extends StatelessWidget {
 
   Future<void> _confirmerDeconnexion(BuildContext context) async {
     final traduction = context.read<TraductionProvider>();
+
     final confirme = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

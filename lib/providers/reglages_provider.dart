@@ -1,0 +1,29 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class ReglagesProvider extends ChangeNotifier {
+  static const _cleTheme = 'theme';
+
+  final SharedPreferences _prefs;
+  ThemeMode _themeMode;
+
+  // la valeur initiale est lue dès la création (pas de await, pas d'écran de chargement)
+  ReglagesProvider(this._prefs) : _themeMode = _lireTheme(_prefs);
+
+  ThemeMode get themeMode => _themeMode;
+
+  // Relit le thème enregistré ('light', 'dark' ou 'system')
+  static ThemeMode _lireTheme(SharedPreferences prefs) {
+    final nom = prefs.getString(_cleTheme);
+    return ThemeMode.values.firstWhere(
+          (m) => m.name == nom,
+      orElse: () => ThemeMode.system,
+    );
+  }
+
+  Future<void> changerTheme(ThemeMode mode) async {
+    _themeMode = mode;
+    notifyListeners();
+    await _prefs.setString(_cleTheme, mode.name);
+  }
+}

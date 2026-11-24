@@ -1,40 +1,79 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agrismart/models/meteo.dart';
 import 'package:agrismart/services/meteo_service.dart';
 
-// Les trois états d'un chargement reseau
+// Les trois états d'un chargement réseau
 enum EtatMeteo { chargement, succes, erreur }
 
 class MeteoProvider extends ChangeNotifier {
+  static const _cleMeteo = 'meteo_json';
+  static const _cleDate = 'meteo_date';
+
+  final SharedPreferences _prefs;
   final MeteoService _service;
 
-  MeteoProvider({MeteoService? service}) : _service = service ?? MeteoService();
+  MeteoProvider(this._prefs, {MeteoService? service})
+      : _service = service ?? MeteoService();
 
   EtatMeteo _etat = EtatMeteo.chargement;
   Meteo? _meteo;
   String _erreur = '';
+  bool _horsLigne = false; // vrai : données enregistrées
+  DateTime? _miseAJour; // moment où ces données ont été reçues
 
   EtatMeteo get etat => _etat;
   Meteo? get meteo => _meteo;
   String get erreur => _erreur;
+  bool get horsLigne => _horsLigne;
+  DateTime? get miseAJour => _miseAJour;
 
   Future<void> charger() async {
-    // TODO 1 : passer l'etat a chargement
     _etat = EtatMeteo.chargement;
     notifyListeners();
 
     try {
-      // TODO 2 : recuperer les donnees
       _meteo = await _service.charger();
       _etat = EtatMeteo.succes;
+      _horsLigne = false;
+      _miseAJour = DateTime.now();
+      await _enregistrer(_meteo!, _miseAJour!);
     } on MeteoException catch (e) {
-      // TODO 3 : gerer l'erreur
-      _erreur = e.message;
-      _etat = EtatMeteo.erreur;
+      _echec(e.message);
     } catch (_) {
-      _erreur = 'Erreur inattendue';
-      _etat = EtatMeteo.erreur;
+      _echec('Erreur inattendue');
     }
-    notifyListeners(); // dans tous les cas, on previent l'ecran
+    notifyListeners(); // dans tous les cas, on prévient l'écran
+  }
+
+  // En cas d'échec : on tente d'afficher la dernière météo enregistrée
+  void _echec(String message) {
+    final enCache = _lireCache();
+    if (enCache != null) {
+      _meteo = enCache;
+      _etat = EtatMeteo.succes;
+      _horsLigne = true;
+      return;
+    }
+    _erreur = message;
+    _etat = EtatMeteo.erreur;
+  }
+
+  Future<void> _enregistrer(Meteo meteo, DateTime date) async {
+    await _prefs.setString(_cleMeteo, jsonEncode(meteo.toJson()));
+    await _prefs.setString(_cleDate, date.toIso8601String());
+  }
+
+  Meteo? _lireCache() {
+    final texte = _prefs.getString(_cleMeteo);
+    if (texte == null) return null;
+    try {
+      final meteo = Meteo.fromJson(jsonDecode(texte) as Map<String, dynamic>);
+      _miseAJour = DateTime.tryParse(_prefs.getString(_cleDate) ?? '');
+      return meteo;
+    } catch (_) {
+      return null; // cache illisible : comme s'il n'y avait rien
+    }
   }
 }

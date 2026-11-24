@@ -28,7 +28,25 @@ class Meteo {
  });
 
  // Total de pluie prevue sur la periode (mm)
- double get pluieTotale => previsions.fold(0.0, (somme, p) => somme + p.pluie);
+ double get pluieTotale =>
+     previsions.fold(0.0, (somme, p) => somme + p.pluie);
+
+ // Conversion en JSON
+ Map<String, dynamic> toJson() {
+  return {
+   'current': {
+    'temperature_2m': temperature,
+    'relative_humidity_2m': humiditeAir,
+    'wind_speed_10m': vent,
+   },
+   'daily': {
+    'time': previsions.map((p) => p.date.toIso8601String()).toList(),
+    'temperature_2m_max': previsions.map((p) => p.tMax).toList(),
+    'temperature_2m_min': previsions.map((p) => p.tMin).toList(),
+    'precipitation_sum': previsions.map((p) => p.pluie).toList(),
+   },
+  };
+ }
 
  factory Meteo.fromJson(Map<String, dynamic> json) {
   final current = json['current'] as Map<String, dynamic>;

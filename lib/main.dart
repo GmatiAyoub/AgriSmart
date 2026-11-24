@@ -1,17 +1,19 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
-import 'package:google_mlkit_translation/google_mlkit_translation.dart'; // 👈 Ajout ML Kit
+import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 import 'package:agrismart/config.dart';
 import 'package:agrismart/firebase_options.dart';
 import 'package:agrismart/providers/auth_provider.dart';
+import 'package:agrismart/providers/reglages_provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
-import 'package:agrismart/providers/traduction_provider.dart'; // 👈 Ajout Provider
+import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/screens/auth_gate.dart';
 import 'package:agrismart/services/auth_locale_service.dart';
 import 'package:agrismart/services/auth_service.dart';
 import 'package:agrismart/services/firebase_auth_service.dart';
-import 'package:agrismart/services/traduction_service.dart'; // 👈 Ajout Service
+import 'package:agrismart/services/traduction_service.dart';
 import 'package:agrismart/theme/app_theme.dart';
 import 'package:agrismart/providers/meteo_provider.dart';
 
@@ -20,7 +22,6 @@ Future<void> main() async {
 
   final AuthService authService;
 
-  // C'est ICI que la magie opère
   if (utiliserFirebase) {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -30,22 +31,23 @@ Future<void> main() async {
     authService = AuthLocaleService();
   }
 
-  // Instanciation du service de traduction
+  // Stockage local : ouvert une seule fois, transmis aux providers
+  final prefs = await SharedPreferences.getInstance();
+
   final traductionService = TraductionService();
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider(authService)),
-        ChangeNotifierProvider(create: (_) => ZonesProvider()),
-        ChangeNotifierProvider(create: (_) => MeteoProvider()..charger()),
-
-        // 👇 Ajout du Provider de traduction
+        ChangeNotifierProvider(create: (_) => ReglagesProvider(prefs)),
+        // L'AuthProvider doit être déclaré AVANT le ZonesProvider
+        ChangeNotifierProvider(
+          create: (context) => ZonesProvider(prefs, context.read<AuthProvider>()),
+        ),
+        ChangeNotifierProvider(create: (_) => MeteoProvider(prefs)..charger()),
         ChangeNotifierProvider(
           create: (_) => TraductionProvider(traductionService)
-          // On lance la préparation du modèle en arrière-plan au démarrage.
-          // (Attention : cela téléchargera ~30 Mo si le modèle n'est pas présent.
-          // Pour une démo, il est plus sûr de déclencher cette action via un bouton).
             ..preparerModele(TranslateLanguage.arabic),
         ),
       ],
@@ -65,7 +67,7 @@ class AgriSmartApp extends StatelessWidget {
       title: 'AgriSmart',
       theme: AppTheme.clair(),
       darkTheme: AppTheme.sombre(),
-      themeMode: ThemeMode.system,
+      themeMode: context.watch<ReglagesProvider>().themeMode,
       locale: traduction.locale,
       builder: (context, child) {
         return Directionality(
