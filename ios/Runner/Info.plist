@@ -24,10 +24,6 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>NSCameraUsageDescription</key>
-	<string>La caméra sert à scanner les QR codes des parcelles et les codes-barres des produits.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Permet de lire un code QR ou un code-barres depuis une photo.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

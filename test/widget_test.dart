@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:agrismart/main.dart';
 import 'package:agrismart/providers/auth_provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
-import 'package:agrismart/providers/interventions_provider.dart';
 import 'package:agrismart/providers/meteo_provider.dart';
 import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/services/auth_locale_service.dart';
@@ -19,7 +18,6 @@ void main() {
         providers: [
           ChangeNotifierProvider(create: (_) => AuthProvider(authService)),
           ChangeNotifierProvider(create: (_) => ZonesProvider()),
-          ChangeNotifierProvider(create: (_) => InterventionsProvider()),
           ChangeNotifierProvider(create: (_) => MeteoProvider()),
           ChangeNotifierProvider(create: (_) => TraductionProvider(traductionService)),
         ],
