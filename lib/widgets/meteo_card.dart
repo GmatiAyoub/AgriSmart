@@ -1,7 +1,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 import 'package:agrismart/models/meteo.dart';
 import 'package:agrismart/providers/meteo_provider.dart';
 import 'package:agrismart/providers/traduction_provider.dart';
@@ -208,26 +207,9 @@ class _Contenu extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  conseil,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.translate, color: Colors.green),
-                tooltip: traduction.tr('traduireArabe'),
-                onPressed: () {
-                  context.read<TraductionProvider>().traduire(
-                    conseil,
-                    TranslateLanguage.french,
-                    TranslateLanguage.arabic,
-                  );
-                },
-              ),
-            ],
+          Text(
+            conseil,
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
 
           // Affichage de la date de mise à jour et de l'état hors ligne
@@ -244,73 +226,6 @@ class _Contenu extends StatelessWidget {
               onPressed: () => context.read<MeteoProvider>().charger(),
               child: Text(traduction.tr('reessayer')),
             ),
-
-          Consumer<TraductionProvider>(
-            builder: (context, trad, _) {
-              if (trad.etat == EtatTraduction.traductionEnCours) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Row(
-                    children: [
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        trad.tr('traductionEnCours'),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              if (trad.etat == EtatTraduction.succes &&
-                  trad.texteTraduit.isNotEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      trad.texteTraduit,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                        fontSize: 14,
-                      ),
-                      textDirection: TextDirection.rtl,
-                    ),
-                  ),
-                );
-              }
-
-              if (trad.etat == EtatTraduction.erreur &&
-                  trad.erreur.isNotEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    trad.erreur,
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                    ),
-                  ),
-                );
-              }
-
-              return const SizedBox.shrink();
-            },
-          ),
         ],
       ),
     );
