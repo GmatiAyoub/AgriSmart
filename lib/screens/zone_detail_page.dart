@@ -94,9 +94,11 @@ class ZoneDetailPage extends StatelessWidget {
     final zonesProvider = context.watch<ZonesProvider>();
     final traduction = context.watch<TraductionProvider>();
 
-    // Retrouver la zone à jour dans le provider
+    // Retrouver la zone à jour dans le provider (en évitant null == null pour l'index 0)
     final zoneActuelle = zonesProvider.zones.firstWhere(
-      (z) => z.id == zone.id || z.nom == zone.nom,
+      (z) =>
+          (z.id != null && zone.id != null && z.id == zone.id) ||
+          (z.nom.trim().toLowerCase() == zone.nom.trim().toLowerCase()),
       orElse: () => zone,
     );
 

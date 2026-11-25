@@ -8,6 +8,7 @@ import 'package:agrismart/firebase_options.dart';
 import 'package:agrismart/providers/auth_provider.dart';
 import 'package:agrismart/providers/reglages_provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
+import 'package:agrismart/providers/planification_provider.dart';
 import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/screens/auth_gate.dart';
 import 'package:agrismart/services/auth_locale_service.dart';
@@ -44,6 +45,17 @@ Future<void> main() async {
         // L'AuthProvider doit être déclaré AVANT le ZonesProvider
         ChangeNotifierProvider(
           create: (context) => ZonesProvider(prefs, context.read<AuthProvider>()),
+        ),
+        ChangeNotifierProxyProvider<ZonesProvider, PlanificationProvider>(
+          create: (context) => PlanificationProvider(
+            prefs,
+            context.read<AuthProvider>(),
+            zonesProvider: context.read<ZonesProvider>(),
+          ),
+          update: (context, zonesProvider, planificationProvider) {
+            planificationProvider?.mettreAJourZonesProvider(zonesProvider);
+            return planificationProvider!;
+          },
         ),
         ChangeNotifierProvider(create: (_) => MeteoProvider(prefs)..charger()),
         ChangeNotifierProvider(
