@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
 import 'package:agrismart/providers/traduction_provider.dart';
+import 'package:agrismart/screens/planification_page.dart';
 import 'package:agrismart/screens/profil_page.dart';
 import 'package:agrismart/screens/statistiques_page.dart';
 import 'package:agrismart/screens/zones_page.dart';
@@ -27,6 +28,7 @@ class _AppShellState extends State<AppShell> {
         index: _onglet,
         children: const [
           ZonesPage(),
+          PlanificationPage(),
           StatistiquesPage(),
           ProfilPage(),
         ],
@@ -51,6 +53,11 @@ class _AppShellState extends State<AppShell> {
               child: const Icon(Icons.grass),
             ),
             label: traduction.tr('zones'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.calendar_month_outlined),
+            selectedIcon: const Icon(Icons.calendar_month),
+            label: traduction.tr('planification'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.bar_chart_outlined),
