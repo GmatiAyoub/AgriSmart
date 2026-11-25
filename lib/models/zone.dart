@@ -1,4 +1,5 @@
 class Zone {
+  final String? id;
   final String nom;
   final String culture;
   double humidite;
@@ -6,18 +7,38 @@ class Zone {
   final bool vanneOuverte;
 
   Zone(
-      this.nom,
-      this.culture,
-      this.humidite,
-      this.seuil, {
-        this.vanneOuverte = false,
-      });
+    this.nom,
+    this.culture,
+    this.humidite,
+    this.seuil, {
+    this.id,
+    this.vanneOuverte = false,
+  });
 
   bool get besoinIrrigation => humidite < seuil;
 
-  // Conversion en JSON (pour l'enregistrer sur l'appareil)
+  Zone copyWith({
+    String? id,
+    String? nom,
+    String? culture,
+    double? humidite,
+    double? seuil,
+    bool? vanneOuverte,
+  }) {
+    return Zone(
+      nom ?? this.nom,
+      culture ?? this.culture,
+      humidite ?? this.humidite,
+      seuil ?? this.seuil,
+      id: id ?? this.id,
+      vanneOuverte: vanneOuverte ?? this.vanneOuverte,
+    );
+  }
+
+  // Conversion en JSON (pour l'enregistrer sur l'appareil ou l'envoyer au backend REST)
   Map<String, dynamic> toJson() {
     return {
+      if (id != null) 'id': id,
       'nom': nom,
       'culture': culture,
       'humidite': humidite,
@@ -26,14 +47,15 @@ class Zone {
     };
   }
 
-  // Reconstruit une zone à partir d'un JSON
+  // Reconstruit une zone à partir d'un JSON (Support MongoDB _id & Node.js REST API keys)
   factory Zone.fromJson(Map<String, dynamic> json) {
     return Zone(
-      json['nom'] as String,
-      json['culture'] as String,
-      (json['humidite'] as num).toDouble(),
-      (json['seuil'] as num).toDouble(),
-      vanneOuverte: (json['vanneOuverte'] as bool?) ?? false,
+      (json['nom'] ?? json['name'] ?? '').toString(),
+      (json['culture'] ?? json['crop'] ?? '').toString(),
+      ((json['humidite'] ?? json['humidity'] ?? 0) as num).toDouble(),
+      ((json['seuil'] ?? json['threshold'] ?? 0) as num).toDouble(),
+      id: (json['id'] ?? json['_id'])?.toString(),
+      vanneOuverte: (json['vanneOuverte'] ?? json['isValveOpen'] ?? json['vanne_ouverte'] ?? false) as bool,
     );
   }
 }

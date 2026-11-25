@@ -63,10 +63,19 @@ class ZonesPage extends StatelessWidget {
 
   Widget _carte(BuildContext context, Zone zone) {
     final provider = context.read<ZonesProvider>();
+    final traduction = context.read<TraductionProvider>();
+
     return ZoneCard(
       zone: zone,
       onAugmenter: () => provider.modifierHumidite(zone, 5),
       onDiminuer: () => provider.modifierHumidite(zone, -5),
+      onToggleVanne: () async {
+        await provider.basculerVanne(zone);
+        if (context.mounted) {
+          final statut = zone.vanneOuverte ? traduction.tr('ouverte') : traduction.tr('fermee');
+          _message(context, '${traduction.tr('vanne')} ${zone.nom} : $statut');
+        }
+      },
       onTap: () => _ouvrirDetail(context, zone),
       onLongPress: () => _confirmerSuppression(context, zone),
     );
@@ -74,9 +83,11 @@ class ZonesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final zonesAffichees = context.watch<ZonesProvider>().zonesAffichees;
-    final toutesLesZones = context.watch<ZonesProvider>().zones;
-    final filtreActif = context.watch<ZonesProvider>().seulementAIrriguer;
+    final zonesProvider = context.watch<ZonesProvider>();
+    final zonesAffichees = zonesProvider.zonesAffichees;
+    final toutesLesZones = zonesProvider.zones;
+    final filtreActif = zonesProvider.seulementAIrriguer;
+    final estEnLigne = zonesProvider.estEnLigneRest;
     final traduction = context.watch<TraductionProvider>();
 
     return Scaffold(
@@ -84,7 +95,6 @@ class ZonesPage extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(traduction.tr('appTitle')),
         actions: [
-          // Bouton de bascule de langue (FR <-> AR)
           ActionChip(
             avatar: const Icon(Icons.language, size: 18),
             label: Text(traduction.estArabe ? 'FR' : 'عربي'),
@@ -109,36 +119,71 @@ class ZonesPage extends StatelessWidget {
         onPressed: () => _ajouter(context),
         child: const Icon(Icons.add),
       ),
-      body: Column(
-        children: [
-          FicheExploitation(humiditeMoyenne: humiditeMoyenne(toutesLesZones)),
-          ResumeExploitation(zones: toutesLesZones),
-          Expanded(
-            child: zonesAffichees.isEmpty
-                ? Center(child: Text(traduction.tr('aucuneZone')))
-                : LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth >= 600) {
-                  return GridView.builder(
-                    padding: const EdgeInsets.only(bottom: 80),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 2.8,
+      body: RefreshIndicator(
+        onRefresh: () => context.read<ZonesProvider>().chargerDepuisApi(),
+        child: Column(
+          children: [
+            // Bandeau d'état REST API (Connecté / Local)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              color: estEnLigne ? Colors.green.shade50 : Colors.orange.shade50,
+              child: Row(
+                children: [
+                  Icon(
+                    estEnLigne ? Icons.cloud_done : Icons.cloud_off,
+                    size: 16,
+                    color: estEnLigne ? Colors.green.shade700 : Colors.orange.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      estEnLigne
+                          ? traduction.tr('serveurConnecte')
+                          : traduction.tr('serveurDeconnecte'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: estEnLigne ? Colors.green.shade800 : Colors.orange.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    itemCount: zonesAffichees.length,
-                    itemBuilder: (context, index) => _carte(context, zonesAffichees[index]),
-                  );
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  itemCount: zonesAffichees.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
-                  itemBuilder: (context, index) => _carte(context, zonesAffichees[index]),
-                );
-              },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 16),
+                    tooltip: traduction.tr('synchroApi'),
+                    onPressed: () => context.read<ZonesProvider>().chargerDepuisApi(),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            FicheExploitation(humiditeMoyenne: humiditeMoyenne(toutesLesZones)),
+            ResumeExploitation(zones: toutesLesZones),
+            Expanded(
+              child: zonesAffichees.isEmpty
+                  ? Center(child: Text(traduction.tr('aucuneZone')))
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (constraints.maxWidth >= 600) {
+                          return GridView.builder(
+                            padding: const EdgeInsets.only(bottom: 80),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 2.8,
+                            ),
+                            itemCount: zonesAffichees.length,
+                            itemBuilder: (context, index) => _carte(context, zonesAffichees[index]),
+                          );
+                        }
+                        return ListView.separated(
+                          padding: const EdgeInsets.only(bottom: 80),
+                          itemCount: zonesAffichees.length,
+                          separatorBuilder: (context, index) => const Divider(height: 1),
+                          itemBuilder: (context, index) => _carte(context, zonesAffichees[index]),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
