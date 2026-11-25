@@ -25,6 +25,7 @@ class _ZoneFormState extends State<ZoneForm> {
   final _cultureCtrl = TextEditingController();
   final _humiditeCtrl = TextEditingController();
   final _seuilCtrl = TextEditingController();
+  bool _vanneOuverte = false;
 
   bool get _modeEdition => widget.zone != null;
 
@@ -36,6 +37,7 @@ class _ZoneFormState extends State<ZoneForm> {
       _nomCtrl.text = zone.nom;
       _cultureCtrl.text = zone.culture;
       _seuilCtrl.text = _formater(zone.seuil);
+      _vanneOuverte = zone.vanneOuverte;
     }
   }
 
@@ -105,7 +107,8 @@ class _ZoneFormState extends State<ZoneForm> {
       culture,
       humidite,
       seuil,
-      vanneOuverte: _modeEdition ? widget.zone!.vanneOuverte : false,
+      id: _modeEdition ? widget.zone!.id : null,
+      vanneOuverte: _vanneOuverte,
     );
 
     widget.onEnregistrer(zone);
@@ -177,10 +180,24 @@ class _ZoneFormState extends State<ZoneForm> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(traduction.tr('vanneInitialState')),
+              subtitle: Text(
+                _vanneOuverte ? traduction.tr('vanneOuverte') : traduction.tr('vanneFermee'),
+              ),
+              value: _vanneOuverte,
+              onChanged: (val) {
+                setState(() {
+                  _vanneOuverte = val;
+                });
+              },
+            ),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _soumettre,
-              child: Text(_modeEdition ? traduction.tr('enregistrer') : traduction.tr('enregistrer')),
+              child: Text(traduction.tr('enregistrer')),
             ),
           ],
         ),
