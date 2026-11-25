@@ -11,22 +11,25 @@ class ZoneFormPage extends StatelessWidget {
   const ZoneFormPage({
     super.key,
     this.zone,
-    this.nomsExistants = const [],
+    required this.nomsExistants,
   });
 
   @override
   Widget build(BuildContext context) {
     final traduction = context.watch<TraductionProvider>();
+    final edition = zone != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(zone == null ? traduction.tr('nouvelleZone') : traduction.tr('modifierZone')),
+        title: Text(edition ? traduction.tr('modifierZone') : traduction.tr('nouvelleZone')),
       ),
       body: SingleChildScrollView(
         child: ZoneForm(
           zone: zone,
           nomsExistants: nomsExistants,
-          onEnregistrer: (nouvelle) => Navigator.pop(context, nouvelle),
+          onEnregistrer: (zoneEnregistree) {
+            Navigator.pop(context, zoneEnregistree);
+          },
         ),
       ),
     );
