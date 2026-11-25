@@ -166,7 +166,7 @@ class TraductionProvider extends ChangeNotifier {
     'emailEnvoye': 'Email de réinitialisation envoyé',
     'creerMonCompte': 'Créer mon compte',
 
-    // Zones Detail / Form
+    // Zones Detail / Form / Vannes
     'nouvelleZone': 'Nouvelle zone',
     'modifierZone': 'Modifier la zone',
     'supprimerZone': 'Supprimer la zone ?',
@@ -177,6 +177,17 @@ class TraductionProvider extends ChangeNotifier {
     'humActuelle': 'Humidité actuelle',
     'seuilIrrigation': "Seuil d'irrigation",
     'vanne': 'Vanne',
+    'vannes': 'Vannes',
+    'irriguer': 'Irriguer',
+    'arreterIrrigation': 'Arrêter l\'irrigation',
+    'ajouterVanne': 'Ajouter une vanne',
+    'modifierVanne': 'Modifier la vanne',
+    'supprimerVanne': 'Supprimer la vanne ?',
+    'nomVanne': 'Nom de la vanne',
+    'aucuneVanne': 'Aucune vanne dans cette zone',
+    'vanneAjoutee': 'Vanne ajoutée',
+    'vanneModifiee': 'Vanne modifiée',
+    'vanneSupprimee': 'Vanne supprimée',
     'ouverte': 'Ouverte',
     'fermee': 'Fermée',
     'ouvrirVanne': 'Ouvrir la vanne',
@@ -312,7 +323,7 @@ class TraductionProvider extends ChangeNotifier {
     'emailEnvoye': 'تم إرسال بريد إعادة تعيين كلمة المرور',
     'creerMonCompte': 'إنشاء حسابي',
 
-    // Zones Detail / Form
+    // Zones Detail / Form / Vannes
     'nouvelleZone': 'منطقة جديدة',
     'modifierZone': 'تعديل المنطقة',
     'supprimerZone': 'حذف المنطقة؟',
@@ -323,6 +334,17 @@ class TraductionProvider extends ChangeNotifier {
     'humActuelle': 'الرطوبة الحالية',
     'seuilIrrigation': 'عتبة الري',
     'vanne': 'الصمام',
+    'vannes': 'الصمامات',
+    'irriguer': 'ريّ',
+    'arreterIrrigation': 'إيقاف الري',
+    'ajouterVanne': 'إضافة صمام',
+    'modifierVanne': 'تعديل الصمام',
+    'supprimerVanne': 'حذف الصمام؟',
+    'nomVanne': 'اسم الصمام',
+    'aucuneVanne': 'لا توجد صمامات في هذه المنطقة',
+    'vanneAjoutee': 'تمت إضافة الصمام',
+    'vanneModifiee': 'تم تعديل الصمام',
+    'vanneSupprimee': 'تم حذف الصمام',
     'ouverte': 'مفتوح',
     'fermee': 'مغلق',
     'ouvrirVanne': 'فتح الصمام',

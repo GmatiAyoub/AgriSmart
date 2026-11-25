@@ -67,13 +67,13 @@ class ZonesPage extends StatelessWidget {
 
     return ZoneCard(
       zone: zone,
-      onAugmenter: () => provider.modifierHumidite(zone, 5),
-      onDiminuer: () => provider.modifierHumidite(zone, -5),
-      onToggleVanne: () async {
-        await provider.basculerVanne(zone);
+      onIrriguer: () async {
+        await provider.irriguerParcelle(zone);
         if (context.mounted) {
-          final statut = zone.vanneOuverte ? traduction.tr('ouverte') : traduction.tr('fermee');
-          _message(context, '${traduction.tr('vanne')} ${zone.nom} : $statut');
+          final statut = zone.auMoinsUneVanneOuverte
+              ? traduction.tr('irriguer')
+              : traduction.tr('arreterIrrigation');
+          _message(context, '${zone.nom} : $statut');
         }
       },
       onTap: () => _ouvrirDetail(context, zone),

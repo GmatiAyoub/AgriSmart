@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agrismart/config.dart';
 import 'package:agrismart/data/jeu_de_donnees.dart';
+import 'package:agrismart/models/vanne.dart';
 import 'package:agrismart/models/zone.dart';
 import 'package:agrismart/providers/auth_provider.dart';
 import 'package:agrismart/services/api_service.dart';
@@ -127,20 +128,24 @@ class ZonesProvider extends ChangeNotifier {
 
   // ---------- Actions CRUD & Gestion des Vannes ----------
 
-  /// Permet d'ouvrir ou fermer la vanne d'une zone [PATCH /api/zones/:id/vanne]
-  Future<void> changerEtatVanne(Zone zone, bool ouverte) async {
+  /// Ouvre ou ferme toutes les vannes d'une parcelle (Bouton "Irriguer")
+  Future<void> irriguerParcelle(Zone zone) async {
     final index = _zones.indexOf(zone);
     if (index == -1) return;
 
-    // Mise à jour locale immédiate (Optimistic UI)
-    final zoneMiseAJour = zone.copyWith(vanneOuverte: ouverte);
-    _zones[index] = zoneMiseAJour;
+    final nouvelleValeur = !zone.auMoinsUneVanneOuverte;
+    final nouvellesVannes = zone.vannes
+        .map((v) => v.copyWith(estOuverte: nouvelleValeur))
+        .toList();
+
+    final zoneModifiee = zone.copyWith(vannes: nouvellesVannes);
+    _zones[index] = zoneModifiee;
     _sauvegarderLocal();
     notifyListeners();
 
     if (utiliserBackendRest && zone.id != null) {
       try {
-        final reponse = await _apiService.changerEtatVanne(zone.id!, ouverte);
+        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
         _zones[index] = reponse;
         _sauvegarderLocal();
         notifyListeners();
@@ -150,9 +155,101 @@ class ZonesProvider extends ChangeNotifier {
     }
   }
 
-  /// Bascule l'état de la vanne (ouvre si fermée, ferme si ouverte)
-  Future<void> basculerVanne(Zone zone) async {
-    await changerEtatVanne(zone, !zone.vanneOuverte);
+  /// Bascule l'état d'une vanne spécifique dans une parcelle
+  Future<void> basculerVanne(Zone zone, int vanneIndex) async {
+    final index = _zones.indexOf(zone);
+    if (index == -1 || vanneIndex < 0 || vanneIndex >= zone.vannes.length) return;
+
+    final v = zone.vannes[vanneIndex];
+    final vannesModifiees = List<Vanne>.from(zone.vannes);
+    vannesModifiees[vanneIndex] = v.copyWith(estOuverte: !v.estOuverte);
+
+    final zoneModifiee = zone.copyWith(vannes: vannesModifiees);
+    _zones[index] = zoneModifiee;
+    _sauvegarderLocal();
+    notifyListeners();
+
+    if (utiliserBackendRest && zone.id != null) {
+      try {
+        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
+        _zones[index] = reponse;
+        _sauvegarderLocal();
+        notifyListeners();
+      } catch (e) {
+        _derniereErreur = e.toString();
+      }
+    }
+  }
+
+  /// Ajoute une nouvelle vanne dans une zone
+  Future<void> ajouterVanne(Zone zone, Vanne nouvelleVanne) async {
+    final index = _zones.indexOf(zone);
+    if (index == -1) return;
+
+    final vannesModifiees = List<Vanne>.from(zone.vannes)..add(nouvelleVanne);
+    final zoneModifiee = zone.copyWith(vannes: vannesModifiees);
+    _zones[index] = zoneModifiee;
+    _sauvegarderLocal();
+    notifyListeners();
+
+    if (utiliserBackendRest && zone.id != null) {
+      try {
+        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
+        _zones[index] = reponse;
+        _sauvegarderLocal();
+        notifyListeners();
+      } catch (e) {
+        _derniereErreur = e.toString();
+      }
+    }
+  }
+
+  /// Modifie une vanne existante dans une zone
+  Future<void> modifierVanne(Zone zone, int vanneIndex, Vanne vanneModifiee) async {
+    final index = _zones.indexOf(zone);
+    if (index == -1 || vanneIndex < 0 || vanneIndex >= zone.vannes.length) return;
+
+    final vannesModifiees = List<Vanne>.from(zone.vannes);
+    vannesModifiees[vanneIndex] = vanneModifiee;
+
+    final zoneModifiee = zone.copyWith(vannes: vannesModifiees);
+    _zones[index] = zoneModifiee;
+    _sauvegarderLocal();
+    notifyListeners();
+
+    if (utiliserBackendRest && zone.id != null) {
+      try {
+        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
+        _zones[index] = reponse;
+        _sauvegarderLocal();
+        notifyListeners();
+      } catch (e) {
+        _derniereErreur = e.toString();
+      }
+    }
+  }
+
+  /// Supprime une vanne d'une zone
+  Future<void> supprimerVanne(Zone zone, int vanneIndex) async {
+    final index = _zones.indexOf(zone);
+    if (index == -1 || vanneIndex < 0 || vanneIndex >= zone.vannes.length) return;
+
+    final vannesModifiees = List<Vanne>.from(zone.vannes)..removeAt(vanneIndex);
+    final zoneModifiee = zone.copyWith(vannes: vannesModifiees);
+    _zones[index] = zoneModifiee;
+    _sauvegarderLocal();
+    notifyListeners();
+
+    if (utiliserBackendRest && zone.id != null) {
+      try {
+        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
+        _zones[index] = reponse;
+        _sauvegarderLocal();
+        notifyListeners();
+      } catch (e) {
+        _derniereErreur = e.toString();
+      }
+    }
   }
 
   /// Modifie l'humidité d'une zone [PATCH /api/zones/:id]

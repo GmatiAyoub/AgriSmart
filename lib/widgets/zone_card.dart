@@ -5,18 +5,14 @@ import 'package:agrismart/providers/traduction_provider.dart';
 
 class ZoneCard extends StatelessWidget {
   final Zone zone;
-  final VoidCallback onAugmenter;
-  final VoidCallback onDiminuer;
-  final VoidCallback? onToggleVanne;
+  final VoidCallback? onIrriguer;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
   const ZoneCard({
     super.key,
     required this.zone,
-    required this.onAugmenter,
-    required this.onDiminuer,
-    this.onToggleVanne,
+    this.onIrriguer,
     this.onTap,
     this.onLongPress,
   });
@@ -25,6 +21,7 @@ class ZoneCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final traduction = context.watch<TraductionProvider>();
     final couleur = zone.besoinIrrigation ? Colors.red : Colors.green;
+    final irrigant = zone.auMoinsUneVanneOuverte;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -59,45 +56,38 @@ class ZoneCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (onToggleVanne != null)
-                          InkWell(
-                            onTap: onToggleVanne,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: irrigant
+                                ? Colors.blue.withValues(alpha: 0.15)
+                                : Colors.grey.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: zone.vanneOuverte
-                                    ? Colors.blue.withValues(alpha: 0.15)
-                                    : Colors.grey.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: zone.vanneOuverte ? Colors.blue : Colors.grey,
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    zone.vanneOuverte ? Icons.water_drop : Icons.water_drop_outlined,
-                                    size: 14,
-                                    color: zone.vanneOuverte ? Colors.blue : Colors.grey,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    zone.vanneOuverte
-                                        ? traduction.tr('ouverte')
-                                        : traduction.tr('fermee'),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: zone.vanneOuverte ? Colors.blue : Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            border: Border.all(
+                              color: irrigant ? Colors.blue : Colors.grey,
+                              width: 1,
                             ),
                           ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                irrigant ? Icons.water_drop : Icons.water_drop_outlined,
+                                size: 14,
+                                color: irrigant ? Colors.blue : Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${zone.nombreVannesOuvertes}/${zone.vannes.length} ${traduction.tr("vanne")}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: irrigant ? Colors.blue : Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -119,21 +109,30 @@ class ZoneCard extends StatelessWidget {
               const SizedBox(width: 12),
               Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${zone.humidite.toStringAsFixed(0)} %'),
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: onDiminuer,
-                        icon: const Icon(Icons.remove),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      IconButton(
-                        onPressed: onAugmenter,
-                        icon: const Icon(Icons.add),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
+                  Text(
+                    '${zone.humidite.toStringAsFixed(0)} %',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 6),
+                  FilledButton.icon(
+                    onPressed: onIrriguer,
+                    icon: Icon(
+                      irrigant ? Icons.stop : Icons.play_arrow,
+                      size: 16,
+                    ),
+                    label: Text(
+                      irrigant
+                          ? traduction.tr('arreterIrrigation')
+                          : traduction.tr('irriguer'),
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: irrigant ? Colors.orange.shade800 : Colors.blue.shade700,
+                    ),
                   ),
                 ],
               ),

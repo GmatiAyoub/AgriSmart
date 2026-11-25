@@ -1,10 +1,12 @@
+import 'package:agrismart/models/vanne.dart';
+
 class Zone {
   final String? id;
   final String nom;
   final String culture;
   double humidite;
   final double seuil;
-  final bool vanneOuverte;
+  final List<Vanne> vannes;
 
   Zone(
     this.nom,
@@ -12,10 +14,19 @@ class Zone {
     this.humidite,
     this.seuil, {
     this.id,
-    this.vanneOuverte = false,
-  });
+    List<Vanne>? vannes,
+    bool vanneOuverte = false,
+  }) : vannes = vannes ??
+            [
+              Vanne(nom: 'Vanne 1', estOuverte: vanneOuverte),
+            ];
 
   bool get besoinIrrigation => humidite < seuil;
+  bool get auMoinsUneVanneOuverte => vannes.any((v) => v.estOuverte);
+  bool get toutesVannesOuvertes => vannes.isNotEmpty && vannes.every((v) => v.estOuverte);
+  int get nombreVannesOuvertes => vannes.where((v) => v.estOuverte).length;
+
+  bool get vanneOuverte => auMoinsUneVanneOuverte;
 
   Zone copyWith({
     String? id,
@@ -23,7 +34,7 @@ class Zone {
     String? culture,
     double? humidite,
     double? seuil,
-    bool? vanneOuverte,
+    List<Vanne>? vannes,
   }) {
     return Zone(
       nom ?? this.nom,
@@ -31,7 +42,7 @@ class Zone {
       humidite ?? this.humidite,
       seuil ?? this.seuil,
       id: id ?? this.id,
-      vanneOuverte: vanneOuverte ?? this.vanneOuverte,
+      vannes: vannes ?? List.from(this.vannes),
     );
   }
 
@@ -43,19 +54,34 @@ class Zone {
       'culture': culture,
       'humidite': humidite,
       'seuil': seuil,
-      'vanneOuverte': vanneOuverte,
+      'vannes': vannes.map((v) => v.toJson()).toList(),
+      'vanneOuverte': auMoinsUneVanneOuverte,
     };
   }
 
   // Reconstruit une zone à partir d'un JSON (Support MongoDB _id & Node.js REST API keys)
   factory Zone.fromJson(Map<String, dynamic> json) {
+    List<Vanne> listeVannes = [];
+    if (json['vannes'] != null && json['vannes'] is List) {
+      listeVannes = (json['vannes'] as List)
+          .map((v) => Vanne.fromJson(v as Map<String, dynamic>))
+          .toList();
+    }
+
+    final bool estOuverteBase =
+        (json['vanneOuverte'] ?? json['isValveOpen'] ?? json['vanne_ouverte'] ?? false) as bool;
+
+    if (listeVannes.isEmpty) {
+      listeVannes = [Vanne(nom: 'Vanne 1', estOuverte: estOuverteBase)];
+    }
+
     return Zone(
       (json['nom'] ?? json['name'] ?? '').toString(),
       (json['culture'] ?? json['crop'] ?? '').toString(),
       ((json['humidite'] ?? json['humidity'] ?? 0) as num).toDouble(),
       ((json['seuil'] ?? json['threshold'] ?? 0) as num).toDouble(),
       id: (json['id'] ?? json['_id'])?.toString(),
-      vanneOuverte: (json['vanneOuverte'] ?? json['isValveOpen'] ?? json['vanne_ouverte'] ?? false) as bool,
+      vannes: listeVannes,
     );
   }
 }
