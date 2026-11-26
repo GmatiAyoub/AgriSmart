@@ -17,6 +17,12 @@ class ZoneDetailPage extends StatelessWidget {
     this.nomsAutres = const [],
   });
 
+  /// Affiche l'erreur renvoyée par le serveur (rien si l'action a réussi).
+  void _signaler(BuildContext context, String? erreur) {
+    if (erreur == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(erreur)));
+  }
+
   Future<void> _modifier(BuildContext context, Zone zoneActuelle) async {
     final nouvelle = await Navigator.push<Zone>(
       context,
@@ -29,7 +35,7 @@ class ZoneDetailPage extends StatelessWidget {
     );
 
     if (nouvelle == null || !context.mounted) return;
-    context.read<ZonesProvider>().remplacer(zoneActuelle, nouvelle);
+    _signaler(context, await context.read<ZonesProvider>().remplacer(zoneActuelle, nouvelle));
   }
 
   Future<void> _dialogVanne(BuildContext context, Zone zoneActuelle, {Vanne? vanneExistante, int? index}) async {
@@ -64,11 +70,13 @@ class ZoneDetailPage extends StatelessWidget {
     if (resultat == null || resultat.isEmpty || !context.mounted) return;
 
     final provider = context.read<ZonesProvider>();
+    String? erreur;
     if (vanneExistante == null) {
-      await provider.ajouterVanne(zoneActuelle, Vanne(nom: resultat));
+      erreur = await provider.ajouterVanne(zoneActuelle, Vanne(nom: resultat));
     } else if (index != null) {
-      await provider.modifierVanne(zoneActuelle, index, vanneExistante.copyWith(nom: resultat));
+      erreur = await provider.modifierVanne(zoneActuelle, index, vanneExistante.copyWith(nom: resultat));
     }
+    if (context.mounted) _signaler(context, erreur);
   }
 
   Future<void> _supprimerVanne(BuildContext context, Zone zoneActuelle, int index, Vanne vanne) async {
@@ -86,7 +94,8 @@ class ZoneDetailPage extends StatelessWidget {
     );
 
     if (confirme != true || !context.mounted) return;
-    await context.read<ZonesProvider>().supprimerVanne(zoneActuelle, index);
+    final erreur = await context.read<ZonesProvider>().supprimerVanne(zoneActuelle, index);
+    if (context.mounted) _signaler(context, erreur);
   }
 
   @override
@@ -96,8 +105,8 @@ class ZoneDetailPage extends StatelessWidget {
 
     // Retrouver la zone à jour dans le provider (en évitant null == null pour l'index 0)
     final zoneActuelle = zonesProvider.zones.firstWhere(
-      (z) =>
-          (z.id != null && zone.id != null && z.id == zone.id) ||
+          (z) =>
+      (z.id != null && zone.id != null && z.id == zone.id) ||
           (z.nom.trim().toLowerCase() == zone.nom.trim().toLowerCase()),
       orElse: () => zone,
     );
@@ -176,7 +185,10 @@ class ZoneDetailPage extends StatelessWidget {
 
           // Bouton d'Irrigation globale de la parcelle
           FilledButton.icon(
-            onPressed: () => context.read<ZonesProvider>().irriguerParcelle(zoneActuelle),
+            onPressed: () async {
+              final erreur = await context.read<ZonesProvider>().irriguerParcelle(zoneActuelle);
+              if (context.mounted) _signaler(context, erreur);
+            },
             icon: Icon(irrigant ? Icons.stop : Icons.play_arrow),
             label: Text(
               irrigant
@@ -244,7 +256,10 @@ class ZoneDetailPage extends StatelessWidget {
                       children: [
                         Switch(
                           value: v.estOuverte,
-                          onChanged: (_) => context.read<ZonesProvider>().basculerVanne(zoneActuelle, i),
+                          onChanged: (_) async {
+                            final erreur = await context.read<ZonesProvider>().basculerVanne(zoneActuelle, i);
+                            if (context.mounted) _signaler(context, erreur);
+                          },
                         ),
                         IconButton(
                           icon: const Icon(Icons.edit, size: 20),

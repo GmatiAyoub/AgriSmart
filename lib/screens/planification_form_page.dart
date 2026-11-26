@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agrismart/models/planification.dart';
 import 'package:agrismart/providers/zones_provider.dart';
@@ -41,7 +41,7 @@ class _PlanificationFormPageState extends State<PlanificationFormPage> {
       _dateSelectionnee = maintenant;
       _heureSelectionnee = TimeOfDay(hour: (maintenant.hour + 1) % 24, minute: 0);
       _dureeMinutes = 30;
-      _repetition = RepetitionIrrigation.uneFois;
+      _repetition = RepetitionIrrigation.quotidienne;
       _estActive = true;
     }
   }
@@ -89,7 +89,7 @@ class _PlanificationFormPageState extends State<PlanificationFormPage> {
     if (!_formKey.currentState!.validate()) return;
     if (_zoneNomChoisie == null || _zoneNomChoisie!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez sélectionner une parcelle')),
+        const SnackBar(content: Text('Veuillez s├®lectionner une parcelle')),
       );
       return;
     }
@@ -116,8 +116,6 @@ class _PlanificationFormPageState extends State<PlanificationFormPage> {
 
   String _libelleRepetition(RepetitionIrrigation r, TraductionProvider traduction) {
     switch (r) {
-      case RepetitionIrrigation.uneFois:
-        return traduction.tr('uneFois');
       case RepetitionIrrigation.quotidienne:
         return traduction.tr('quotidienne');
       case RepetitionIrrigation.hebdomadaire:
@@ -203,7 +201,7 @@ class _PlanificationFormPageState extends State<PlanificationFormPage> {
               ),
               const SizedBox(height: 16),
 
-              // Durée (en minutes)
+              // Dur├®e (en minutes)
               DropdownButtonFormField<int>(
                 initialValue: _dureeMinutes,
                 decoration: InputDecoration(
@@ -223,7 +221,7 @@ class _PlanificationFormPageState extends State<PlanificationFormPage> {
               ),
               const SizedBox(height: 16),
 
-              // Répétition
+              // R├®p├®tition
               DropdownButtonFormField<RepetitionIrrigation>(
                 initialValue: _repetition,
                 decoration: InputDecoration(

@@ -1,232 +1,159 @@
-import 'dart:async';
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:agrismart/models/planification.dart';
 import 'package:agrismart/providers/auth_provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
+import 'package:agrismart/services/api_service.dart';
 
+/// Planifications d'irrigation.
+/// Elles sont stock├®es ET ex├®cut├®es par le backend (m├¬me app ferm├®e) : l'app ne fait qu'afficher
+/// et modifier. Les actions retournent `null` si tout va bien, sinon le message d'erreur.
 class PlanificationProvider extends ChangeNotifier {
-  final SharedPreferences _prefs;
+  final ApiService _api;
   final AuthProvider _auth;
   ZonesProvider? _zonesProvider;
 
   final List<PlanificationIrrigation> _planifications = [];
   String? _uid;
-  Timer? _timerExecution;
+  int _generation = 0;
+  bool _estEnChargement = false;
+  String? _derniereErreur;
 
-  PlanificationProvider(this._prefs, this._auth, {ZonesProvider? zonesProvider}) {
+  PlanificationProvider(this._api, this._auth, {ZonesProvider? zonesProvider}) {
     _zonesProvider = zonesProvider;
     _auth.addListener(_surChangementUtilisateur);
     _actualiser();
-    _demarrerTimerExecution();
   }
 
   void mettreAJourZonesProvider(ZonesProvider zonesProvider) {
     _zonesProvider = zonesProvider;
-    verifierEtExecuterPlanifications();
-  }
-
-  void _demarrerTimerExecution() {
-    _timerExecution?.cancel();
-    _timerExecution = Timer.periodic(const Duration(seconds: 4), (_) {
-      verifierEtExecuterPlanifications();
-    });
   }
 
   List<PlanificationIrrigation> get planifications => List.unmodifiable(_planifications);
-
   int get nombre => _planifications.length;
   int get nombreActives => _planifications.where((p) => p.estActive).length;
+  bool get estEnChargement => _estEnChargement;
+  String? get derniereErreur => _derniereErreur;
 
-  String _cle(String uid) => 'planifications_$uid';
+  // ---------- Cycle de vie / utilisateur ----------
 
-  void _sauvegarderLocal() {
-    final uid = _uid;
-    if (uid == null) return;
-    final texte = jsonEncode(_planifications.map((p) => p.toJson()).toList());
-    _prefs.setString(_cle(uid), texte);
-  }
-
-  List<PlanificationIrrigation> _lireLocal(String uid) {
-    final texte = _prefs.getString(_cle(uid));
-    if (texte == null) return _jeuDeDonneesParDefaut();
-    try {
-      final liste = jsonDecode(texte) as List<dynamic>;
-      return liste
-          .map((e) => PlanificationIrrigation.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return _jeuDeDonneesParDefaut();
-    }
+  void _surChangementUtilisateur() {
+    if (_actualiser()) notifyListeners();
   }
 
   bool _actualiser() {
     final uid = _auth.utilisateur?.uid;
     if (uid == _uid) return false;
     _uid = uid;
-    _planifications.clear();
-    if (uid != null) {
-      _planifications.addAll(_lireLocal(uid));
-    }
-    return true;
-  }
 
-  void _surChangementUtilisateur() {
-    if (_actualiser()) notifyListeners();
+    _generation++;
+    _planifications.clear();
+    _derniereErreur = null;
+    _estEnChargement = false;
+
+    if (uid != null) charger();
+    return true;
   }
 
   @override
   void dispose() {
-    _timerExecution?.cancel();
     _auth.removeListener(_surChangementUtilisateur);
     super.dispose();
   }
 
-  List<PlanificationIrrigation> _jeuDeDonneesParDefaut() {
-    final maintenant = DateTime.now();
-    return [
-      PlanificationIrrigation(
-        zoneNom: 'Parcelle Sud',
-        dateHeure: maintenant.add(const Duration(minutes: 5)),
-        dureeMinutes: 15,
-        repetition: RepetitionIrrigation.uneFois,
-        estActive: true,
-      ),
-      PlanificationIrrigation(
-        zoneNom: 'Serre 1',
-        dateHeure: maintenant.add(const Duration(hours: 1)),
-        dureeMinutes: 30,
-        repetition: RepetitionIrrigation.quotidienne,
-        estActive: true,
-      ),
-    ];
-  }
+  // ---------- Chargement ----------
 
-  /// Vérifie et déclenche automatiquement l'irrigation pour les planifications en cours
-  void verifierEtExecuterPlanifications() {
-    final zonesProv = _zonesProvider;
-    if (zonesProv == null) return;
+  Future<void> charger({bool silencieux = false}) async {
+    if (_auth.utilisateur == null) return;
 
-    final maintenant = DateTime.now();
-    bool modifie = false;
-
-    for (int i = 0; i < _planifications.length; i++) {
-      final p = _planifications[i];
-      if (!p.estActive) continue;
-
-      final debut = p.dateHeure;
-      final fin = p.dateHeure.add(Duration(minutes: p.dureeMinutes));
-
-      // 1. Si nous sommes dans la plage horaire programmée (début <= maintenant < fin)
-      if ((maintenant.isAfter(debut) || maintenant.isAtSameMomentAs(debut)) && maintenant.isBefore(fin)) {
-        final zoneIndex = zonesProv.zones.indexWhere(
-          (z) => z.nom.trim().toLowerCase() == p.zoneNom.trim().toLowerCase(),
-        );
-
-        if (zoneIndex != -1) {
-          final zone = zonesProv.zones[zoneIndex];
-          // Ouvrir automatiquement toutes les vannes de la parcelle
-          if (!zone.auMoinsUneVanneOuverte) {
-            zonesProv.irriguerParcelle(zone);
-          }
-        }
-      }
-
-      // 2. Si la durée d'irrigation est terminée (maintenant >= fin)
-      if (maintenant.isAfter(fin) || maintenant.isAtSameMomentAs(fin)) {
-        final zoneIndex = zonesProv.zones.indexWhere(
-          (z) => z.nom.trim().toLowerCase() == p.zoneNom.trim().toLowerCase(),
-        );
-
-        if (zoneIndex != -1) {
-          final zone = zonesProv.zones[zoneIndex];
-          // Fermer les vannes de la parcelle à la fin du temps imparti
-          if (zone.auMoinsUneVanneOuverte) {
-            zonesProv.irriguerParcelle(zone);
-          }
-        }
-
-        // Mettre à jour la répétition
-        if (p.repetition == RepetitionIrrigation.uneFois) {
-          _planifications[i] = p.copyWith(estActive: false);
-          modifie = true;
-        } else if (p.repetition == RepetitionIrrigation.quotidienne) {
-          _planifications[i] = p.copyWith(dateHeure: p.dateHeure.add(const Duration(days: 1)));
-          modifie = true;
-        } else if (p.repetition == RepetitionIrrigation.hebdomadaire) {
-          _planifications[i] = p.copyWith(dateHeure: p.dateHeure.add(const Duration(days: 7)));
-          modifie = true;
-        }
-      }
-    }
-
-    if (modifie) {
-      _sauvegarderLocal();
+    final generation = ++_generation;
+    if (!silencieux) {
+      _estEnChargement = true;
       notifyListeners();
     }
-  }
 
-  Future<void> ajouter(PlanificationIrrigation item) async {
-    _planifications.add(item);
-    _sauvegarderLocal();
-    notifyListeners();
-    verifierEtExecuterPlanifications();
-  }
-
-  Future<void> modifier(PlanificationIrrigation ancien, PlanificationIrrigation nouveau) async {
-    final index = _planifications.indexOf(ancien);
-    if (index != -1) {
-      _planifications[index] = nouveau;
-      _sauvegarderLocal();
-      notifyListeners();
-      verifierEtExecuterPlanifications();
-    }
-  }
-
-  Future<void> supprimer(PlanificationIrrigation item) async {
-    final zonesProv = _zonesProvider;
-    if (zonesProv != null) {
-      final zoneIndex = zonesProv.zones.indexWhere(
-        (z) => z.nom.trim().toLowerCase() == item.zoneNom.trim().toLowerCase(),
-      );
-      if (zoneIndex != -1) {
-        final zone = zonesProv.zones[zoneIndex];
-        if (zone.auMoinsUneVanneOuverte) {
-          zonesProv.irriguerParcelle(zone);
-        }
+    try {
+      final liste = await _api.getPlanifications();
+      if (generation != _generation) return;
+      _planifications
+        ..clear()
+        ..addAll(liste);
+      _derniereErreur = null;
+    } on ApiException catch (e) {
+      if (generation != _generation) return;
+      _derniereErreur = e.message;
+    } catch (_) {
+      if (generation != _generation) return;
+      _derniereErreur = 'Erreur lors du chargement des planifications';
+    } finally {
+      if (generation == _generation) {
+        _estEnChargement = false;
+        notifyListeners();
       }
     }
-    _planifications.remove(item);
-    _sauvegarderLocal();
-    notifyListeners();
   }
 
-  Future<void> basculerEtat(PlanificationIrrigation item) async {
-    final index = _planifications.indexOf(item);
-    if (index == -1) return;
+  /// Ex├®cute une action, puis recharge les planifications ET les zones
+  /// (d├®sactiver ou supprimer une planification en cours ferme les vannes c├┤t├® serveur).
+  Future<String?> _executer(Future<void> Function() action) async {
+    String? erreur;
+    try {
+      await action();
+    } on ApiException catch (e) {
+      erreur = e.message;
+    } catch (_) {
+      erreur = 'Une erreur est survenue';
+    }
+    await Future.wait([
+      charger(silencieux: true),
+      _zonesProvider?.chargerDepuisApi(silencieux: true) ?? Future.value(),
+    ]);
+    return erreur;
+  }
 
-    final nouveauStatut = !item.estActive;
-    final itemModifie = item.copyWith(estActive: nouveauStatut);
-    _planifications[index] = itemModifie;
-    _sauvegarderLocal();
-    notifyListeners();
-
-    final zonesProv = _zonesProvider;
-    if (zonesProv != null && !nouveauStatut) {
-      final zoneIndex = zonesProv.zones.indexWhere(
-        (z) => z.nom.trim().toLowerCase() == item.zoneNom.trim().toLowerCase(),
-      );
-
-      if (zoneIndex != -1) {
-        final zone = zonesProv.zones[zoneIndex];
-        // En désactivant la planification, la parcelle passe au repos (vannes fermées)
-        if (zone.auMoinsUneVanneOuverte) {
-          zonesProv.irriguerParcelle(zone);
-        }
+  /// Retrouve l'id de la parcelle ├á partir de son nom (choisi dans le formulaire).
+  String _idParcelle(String zoneNom) {
+    final zones = _zonesProvider?.zones ?? const [];
+    for (final z in zones) {
+      if (z.id != null && z.nom.trim().toLowerCase() == zoneNom.trim().toLowerCase()) {
+        return z.id!;
       }
     }
+    throw ApiException('Parcelle introuvable');
+  }
 
-    verifierEtExecuterPlanifications();
+  // ---------- Actions ----------
+
+  Future<String?> ajouter(PlanificationIrrigation item) {
+    return _executer(() async {
+      await _api.creerPlanification(item.copyWith(parcelleId: _idParcelle(item.zoneNom)));
+    });
+  }
+
+  Future<String?> modifier(PlanificationIrrigation ancien, PlanificationIrrigation nouveau) {
+    final id = ancien.id;
+    if (id == null) return Future.value('Planification sans identifiant');
+
+    return _executer(() async {
+      final nouvelleParcelle = _idParcelle(nouveau.zoneNom);
+      if (nouvelleParcelle == ancien.parcelleId) {
+        await _api.modifierPlanification(id, nouveau);
+      } else {
+        // Le serveur ne permet pas de changer de parcelle : on cr├®e la nouvelle, puis on supprime l'ancienne
+        await _api.creerPlanification(nouveau.copyWith(parcelleId: nouvelleParcelle));
+        await _api.supprimerPlanification(id);
+      }
+    });
+  }
+
+  Future<String?> supprimer(PlanificationIrrigation item) {
+    final id = item.id;
+    if (id == null) return Future.value('Planification sans identifiant');
+    return _executer(() => _api.supprimerPlanification(id));
+  }
+
+  Future<String?> basculerEtat(PlanificationIrrigation item) {
+    final id = item.id;
+    if (id == null) return Future.value('Planification sans identifiant');
+    return _executer(() => _api.activerPlanification(id, !item.estActive));
   }
 }

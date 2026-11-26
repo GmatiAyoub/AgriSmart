@@ -1,228 +1,231 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:agrismart/config.dart';
+import 'package:agrismart/models/planification.dart';
+import 'package:agrismart/models/vanne.dart';
 import 'package:agrismart/models/zone.dart';
 
-/// Exception personnalisée pour les erreurs API REST HTTP
+/// Erreur renvoyée par le backend (`{ message, code }`) ou erreur réseau.
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
-  final dynamic details;
+  final String? code; // ex. PLANIFICATION_CHEVAUCHEMENT
 
-  ApiException(this.message, {this.statusCode, this.details});
+  ApiException(this.message, {this.statusCode, this.code});
 
   @override
-  String toString() => 'ApiException: $message (Code: $statusCode)';
+  String toString() => message;
 }
 
-/// Service centralisé de gestion des requêtes HTTP REST pour la communication avec le backend Node.js / Express
+/// Unique point d'accès au backend : connexion JWT, requêtes, conversion des erreurs.
 class ApiService {
   final String baseUrl;
   final http.Client _client;
 
-  ApiService({
-    String? baseUrl,
-    http.Client? client,
-  })  : baseUrl = baseUrl ?? apiBaseUrlDefault,
+  String? _token;
+  Future<void>? _connexionEnCours; // évite deux connexions simultanées
+
+  ApiService({String? baseUrl, http.Client? client})
+      : baseUrl = baseUrl ?? apiBaseUrl,
         _client = client ?? http.Client();
 
-  Map<String, String> get _headers => {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Accept': 'application/json',
-      };
+  void dispose() => _client.close();
 
-  /// [GET] Consulter toutes les zones et leurs vannes
+  /// À appeler à la déconnexion de l'utilisateur.
+  void deconnecter() => _token = null;
+
+  // ---------------------------------------------------------------------------
+  // Authentification (compte unique du backend)
+  // ---------------------------------------------------------------------------
+
+  Future<void> _assurerToken() {
+    if (_token != null) return Future.value();
+    return _connexionEnCours ??= _seConnecter().whenComplete(() => _connexionEnCours = null);
+  }
+
+  Future<void> _seConnecter() async {
+    if (apiPassword.isEmpty) {
+      throw ApiException(
+        'Identifiants du serveur non configurés (lancez avec --dart-define=API_PASSWORD=...)',
+      );
+    }
+    final data = await _requete(
+      'POST',
+      '/auth/login',
+      corps: {'username': apiUsername, 'password': apiPassword},
+      authentifie: false,
+    );
+    _token = (data as Map<String, dynamic>)['token'] as String;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Requête générique
+  // ---------------------------------------------------------------------------
+
+  Future<dynamic> _requete(
+      String methode,
+      String chemin, {
+        Object? corps,
+        bool authentifie = true,
+        bool nouvelEssai = true,
+      }) async {
+    try {
+      if (authentifie) await _assurerToken();
+
+      final requete = http.Request(methode, Uri.parse('$baseUrl$chemin'));
+      requete.headers['Accept'] = 'application/json';
+      if (corps != null) {
+        requete.headers['Content-Type'] = 'application/json; charset=UTF-8';
+        requete.body = jsonEncode(corps);
+      }
+      if (authentifie) requete.headers['Authorization'] = 'Bearer $_token';
+
+      final flux = await _client.send(requete).timeout(const Duration(seconds: 15));
+      final reponse = await http.Response.fromStream(flux);
+
+      // Token expiré (8 h) : on se reconnecte une fois, puis on rejoue la requête
+      if (reponse.statusCode == 401 && authentifie && nouvelEssai) {
+        _token = null;
+        return _requete(methode, chemin, corps: corps, nouvelEssai: false);
+      }
+      return _traiter(reponse);
+    } on ApiException {
+      rethrow;
+    } on TimeoutException {
+      throw ApiException("Le serveur ne répond pas ($baseUrl)");
+    } on http.ClientException {
+      throw ApiException('Serveur injoignable ($baseUrl)');
+    } on FormatException {
+      throw ApiException('Réponse inattendue du serveur');
+    }
+  }
+
+  dynamic _traiter(http.Response reponse) {
+    dynamic corps;
+    if (reponse.body.isNotEmpty) {
+      try {
+        corps = jsonDecode(utf8.decode(reponse.bodyBytes));
+      } catch (_) {
+        corps = null;
+      }
+    }
+
+    if (reponse.statusCode >= 200 && reponse.statusCode < 300) return corps;
+
+    var message = 'Erreur serveur (${reponse.statusCode})';
+    String? code;
+    if (corps is Map<String, dynamic>) {
+      message = (corps['message'] ?? message).toString();
+      code = corps['code']?.toString();
+    }
+    throw ApiException(message, statusCode: reponse.statusCode, code: code);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Parcelles (zones)
+  // ---------------------------------------------------------------------------
+
+  /// Parcelles + leurs vannes (2 requêtes : le détail des vannes n'est pas dans la liste).
   Future<List<Zone>> getZones() async {
-    try {
-      final response = await _client
-          .get(Uri.parse('$baseUrl/zones'), headers: _headers)
-          .timeout(const Duration(seconds: 6));
+    await _assurerToken();
+    final resultats = await Future.wait([
+      _requete('GET', '/parcelles'),
+      _requete('GET', '/vannes'),
+    ]);
 
-      final data = _traiterReponse(response);
-      if (data is List) {
-        return data.map((item) => Zone.fromJson(item as Map<String, dynamic>)).toList();
-      } else if (data is Map<String, dynamic> && data.containsKey('zones')) {
-        final list = data['zones'] as List;
-        return list.map((item) => Zone.fromJson(item as Map<String, dynamic>)).toList();
-      } else if (data is Map<String, dynamic> && data.containsKey('data')) {
-        final list = data['data'] as List;
-        return list.map((item) => Zone.fromJson(item as Map<String, dynamic>)).toList();
-      }
-      return [];
-    } on SocketException catch (_) {
-      throw ApiException('Serveur backend REST indisponible ($baseUrl)');
-    } on TimeoutException catch (_) {
-      throw ApiException('Délai d\'attente dépassé lors de la connexion au serveur');
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('Erreur lors de la récupération des zones: $e');
+    final vannesParParcelle = <String, List<Vanne>>{};
+    for (final v in (resultats[1] as List).cast<Map<String, dynamic>>()) {
+      vannesParParcelle
+          .putIfAbsent(v['parcelleId'].toString(), () => [])
+          .add(Vanne.fromJson(v));
     }
+
+    return (resultats[0] as List).cast<Map<String, dynamic>>().map((p) {
+      final zone = Zone.fromJson(p);
+      return zone.copyWith(vannes: vannesParParcelle[zone.id] ?? const <Vanne>[]);
+    }).toList();
   }
 
-  /// [GET] Consulter une zone spécifique par ID
-  Future<Zone> getZoneById(String id) async {
-    try {
-      final response = await _client
-          .get(Uri.parse('$baseUrl/zones/$id'), headers: _headers)
-          .timeout(const Duration(seconds: 6));
+  Map<String, dynamic> _corpsParcelle(Zone z) => {
+    'nom': z.nom,
+    'culture': z.culture,
+    'humidite': z.humidite,
+    'seuil': z.seuil,
+  };
 
-      final data = _traiterReponse(response);
-      return Zone.fromJson(data as Map<String, dynamic>);
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('Erreur lors de la consultation de la zone: $e');
-    }
-  }
-
-  /// [POST] Ajouter une nouvelle zone / vanne
-  Future<Zone> ajouterZone(Zone zone) async {
-    try {
-      final response = await _client
-          .post(
-            Uri.parse('$baseUrl/zones'),
-            headers: _headers,
-            body: jsonEncode(zone.toJson()),
-          )
-          .timeout(const Duration(seconds: 6));
-
-      final data = _traiterReponse(response);
-      if (data is Map<String, dynamic>) {
-        final obj = data.containsKey('zone') ? data['zone'] : (data.containsKey('data') ? data['data'] : data);
-        return Zone.fromJson(obj as Map<String, dynamic>);
-      }
-      return zone;
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('Erreur lors de l\'ajout de la zone: $e');
-    }
-  }
-
-  /// [PUT] Modifier complètement une zone / vanne
-  Future<Zone> modifierZone(String id, Zone zone) async {
-    try {
-      final response = await _client
-          .put(
-            Uri.parse('$baseUrl/zones/$id'),
-            headers: _headers,
-            body: jsonEncode(zone.toJson()),
-          )
-          .timeout(const Duration(seconds: 6));
-
-      final data = _traiterReponse(response);
-      if (data is Map<String, dynamic>) {
-        final obj = data.containsKey('zone') ? data['zone'] : (data.containsKey('data') ? data['data'] : data);
-        return Zone.fromJson(obj as Map<String, dynamic>);
-      }
-      return zone;
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('Erreur lors de la modification de la zone: $e');
-    }
-  }
-
-  /// [PATCH] Modifier partiellement une zone / vanne
-  Future<Zone> patchZone(String id, Map<String, dynamic> modifications) async {
-    try {
-      final response = await _client
-          .patch(
-            Uri.parse('$baseUrl/zones/$id'),
-            headers: _headers,
-            body: jsonEncode(modifications),
-          )
-          .timeout(const Duration(seconds: 6));
-
-      final data = _traiterReponse(response);
-      if (data is Map<String, dynamic>) {
-        final obj = data.containsKey('zone') ? data['zone'] : (data.containsKey('data') ? data['data'] : data);
-        return Zone.fromJson(obj as Map<String, dynamic>);
-      }
-      throw ApiException('Réponse inattendue lors de la mise à jour');
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('Erreur lors de la mise à jour partielle: $e');
-    }
-  }
-
-  /// [DELETE] Supprimer une zone / vanne
-  Future<void> supprimerZone(String id) async {
-    try {
-      final response = await _client
-          .delete(
-            Uri.parse('$baseUrl/zones/$id'),
-            headers: _headers,
-          )
-          .timeout(const Duration(seconds: 6));
-
-      _traiterReponse(response);
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('Erreur lors de la suppression de la zone: $e');
-    }
-  }
-
-  /// [PATCH] Ouverture ou Fermeture de la vanne d'une zone
-  Future<Zone> changerEtatVanne(String id, bool ouverte) async {
-    final payload = {
-      'vanneOuverte': ouverte,
-      'action': ouverte ? 'ouverture' : 'fermeture',
-    };
+  /// Crée la parcelle puis ses vannes. Si une vanne échoue, la parcelle est supprimée.
+  Future<void> creerZone(Zone zone) async {
+    final creee = await _requete('POST', '/parcelles', corps: _corpsParcelle(zone));
+    final id = (creee as Map<String, dynamic>)['id'].toString();
 
     try {
-      // Tentative vers endpoint dédié /zones/:id/vanne ou fallback /zones/:id
-      late http.Response response;
-      try {
-        response = await _client
-            .patch(
-              Uri.parse('$baseUrl/zones/$id/vanne'),
-              headers: _headers,
-              body: jsonEncode(payload),
-            )
-            .timeout(const Duration(seconds: 6));
-      } catch (_) {
-        response = await _client
-            .patch(
-              Uri.parse('$baseUrl/zones/$id'),
-              headers: _headers,
-              body: jsonEncode(payload),
-            )
-            .timeout(const Duration(seconds: 6));
+      for (final vanne in zone.vannes) {
+        await creerVanne(id, vanne.nom);
       }
-
-      final data = _traiterReponse(response);
-      if (data is Map<String, dynamic>) {
-        final obj = data.containsKey('zone') ? data['zone'] : (data.containsKey('data') ? data['data'] : data);
-        return Zone.fromJson(obj as Map<String, dynamic>);
+      if (zone.auMoinsUneVanneOuverte && zone.vannes.isNotEmpty) {
+        await irriguer(id, true);
       }
-      throw ApiException('Format de réponse invalide');
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('Erreur lors du changement d\'état de la vanne: $e');
+    } catch (_) {
+      await _requete('DELETE', '/parcelles/$id').catchError((_) {});
+      rethrow;
     }
   }
 
-  /// Centralisation du traitement des réponses et des exceptions HTTP
-  dynamic _traiterReponse(http.Response response) {
-    final statusCode = response.statusCode;
-    dynamic body;
-    if (response.body.isNotEmpty) {
-      try {
-        body = jsonDecode(response.body);
-      } catch (_) {
-        body = response.body;
-      }
-    }
+  /// Modifie uniquement la parcelle (les vannes se gèrent séparément).
+  Future<void> modifierZone(String id, Zone zone) =>
+      _requete('PUT', '/parcelles/$id', corps: _corpsParcelle(zone));
 
-    if (statusCode >= 200 && statusCode < 300) {
-      return body;
-    }
+  Future<void> supprimerZone(String id) => _requete('DELETE', '/parcelles/$id');
 
-    String message = 'Erreur HTTP $statusCode';
-    if (body is Map<String, dynamic>) {
-      message = body['message'] ?? body['erreur'] ?? body['error'] ?? message;
-    }
+  /// Ouvre ou ferme toutes les vannes d'une parcelle.
+  Future<void> irriguer(String parcelleId, bool ouvrir) => _requete(
+    'POST',
+    '/parcelles/$parcelleId/irrigation',
+    corps: {'action': ouvrir ? 'ouvrir' : 'fermer'},
+  );
 
-    throw ApiException(message, statusCode: statusCode, details: body);
+  // ---------------------------------------------------------------------------
+  // Vannes
+  // ---------------------------------------------------------------------------
+
+  Future<void> creerVanne(String parcelleId, String nom) => _requete(
+    'POST',
+    '/vannes',
+    corps: {'nom': nom, 'parcelleId': int.parse(parcelleId)},
+  );
+
+  Future<void> renommerVanne(String vanneId, String nom) =>
+      _requete('PUT', '/vannes/$vanneId', corps: {'nom': nom});
+
+  Future<void> supprimerVanne(String vanneId) => _requete('DELETE', '/vannes/$vanneId');
+
+  Future<void> commanderVanne(String vanneId, bool ouvrir) => _requete(
+    'POST',
+    '/vannes/$vanneId/commande',
+    corps: {'action': ouvrir ? 'ouvrir' : 'fermer'},
+  );
+
+  // ---------------------------------------------------------------------------
+  // Planifications
+  // ---------------------------------------------------------------------------
+
+  Future<List<PlanificationIrrigation>> getPlanifications() async {
+    final data = await _requete('GET', '/planifications');
+    return (data as List)
+        .cast<Map<String, dynamic>>()
+        .map(PlanificationIrrigation.fromJson)
+        .toList();
   }
+
+  Future<void> creerPlanification(PlanificationIrrigation p) =>
+      _requete('POST', '/planifications', corps: p.versApi(creation: true));
+
+  Future<void> modifierPlanification(String id, PlanificationIrrigation p) =>
+      _requete('PUT', '/planifications/$id', corps: p.versApi());
+
+  Future<void> activerPlanification(String id, bool active) =>
+      _requete('PUT', '/planifications/$id', corps: {'active': active});
+
+  Future<void> supprimerPlanification(String id) => _requete('DELETE', '/planifications/$id');
 }

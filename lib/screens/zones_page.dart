@@ -25,8 +25,9 @@ class ZonesPage extends StatelessWidget {
       MaterialPageRoute(builder: (_) => ZoneFormPage(nomsExistants: noms)),
     );
     if (nouvelle == null || !context.mounted) return;
-    context.read<ZonesProvider>().ajouter(nouvelle);
-    _message(context, traduction.tr('zoneAjoutee'));
+    final erreur = await context.read<ZonesProvider>().ajouter(nouvelle);
+    if (!context.mounted) return;
+    _message(context, erreur ?? traduction.tr('zoneAjoutee'));
   }
 
   Future<void> _ouvrirDetail(BuildContext context, Zone zone) async {
@@ -39,8 +40,9 @@ class ZonesPage extends StatelessWidget {
       ),
     );
     if (modifiee == null || !context.mounted) return;
-    context.read<ZonesProvider>().remplacer(zone, modifiee);
-    _message(context, traduction.tr('zoneModifiee'));
+    final erreur = await context.read<ZonesProvider>().remplacer(zone, modifiee);
+    if (!context.mounted) return;
+    _message(context, erreur ?? traduction.tr('zoneModifiee'));
   }
 
   Future<void> _confirmerSuppression(BuildContext context, Zone zone) async {
@@ -57,8 +59,9 @@ class ZonesPage extends StatelessWidget {
       ),
     );
     if (confirme != true || !context.mounted) return;
-    context.read<ZonesProvider>().supprimer(zone);
-    _message(context, traduction.tr('zoneSupprimee'));
+    final erreur = await context.read<ZonesProvider>().supprimer(zone);
+    if (!context.mounted) return;
+    _message(context, erreur ?? traduction.tr('zoneSupprimee'));
   }
 
   Widget _carte(BuildContext context, Zone zone) {
@@ -68,13 +71,13 @@ class ZonesPage extends StatelessWidget {
     return ZoneCard(
       zone: zone,
       onIrriguer: () async {
-        await provider.irriguerParcelle(zone);
-        if (context.mounted) {
-          final statut = zone.auMoinsUneVanneOuverte
-              ? traduction.tr('irriguer')
-              : traduction.tr('arreterIrrigation');
-          _message(context, '${zone.nom} : $statut');
-        }
+        final demarrage = !zone.auMoinsUneVanneOuverte;
+        final erreur = await provider.irriguerParcelle(zone);
+        if (!context.mounted) return;
+        final statut = demarrage
+            ? traduction.tr('irriguer')
+            : traduction.tr('arreterIrrigation');
+        _message(context, erreur ?? '${zone.nom} : $statut');
       },
       onTap: () => _ouvrirDetail(context, zone),
       onLongPress: () => _confirmerSuppression(context, zone),
@@ -139,7 +142,7 @@ class ZonesPage extends StatelessWidget {
                     child: Text(
                       estEnLigne
                           ? traduction.tr('serveurConnecte')
-                          : traduction.tr('serveurDeconnecte'),
+                          : (zonesProvider.derniereErreur ?? traduction.tr('serveurDeconnecte')),
                       style: TextStyle(
                         fontSize: 12,
                         color: estEnLigne ? Colors.green.shade800 : Colors.orange.shade800,
@@ -159,28 +162,52 @@ class ZonesPage extends StatelessWidget {
             ResumeExploitation(zones: toutesLesZones),
             Expanded(
               child: zonesAffichees.isEmpty
-                  ? Center(child: Text(traduction.tr('aucuneZone')))
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        if (constraints.maxWidth >= 600) {
-                          return GridView.builder(
-                            padding: const EdgeInsets.only(bottom: 80),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 2.8,
-                            ),
-                            itemCount: zonesAffichees.length,
-                            itemBuilder: (context, index) => _carte(context, zonesAffichees[index]),
-                          );
-                        }
-                        return ListView.separated(
-                          padding: const EdgeInsets.only(bottom: 80),
-                          itemCount: zonesAffichees.length,
-                          separatorBuilder: (context, index) => const Divider(height: 1),
-                          itemBuilder: (context, index) => _carte(context, zonesAffichees[index]),
-                        );
-                      },
+                  ? (zonesProvider.estEnChargement
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                // ListView : permet le « tirer pour actualiser » même quand la liste est vide
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 80),
+                  Center(
+                    child: Text(
+                      estEnLigne
+                          ? traduction.tr('aucuneZone')
+                          : (zonesProvider.derniereErreur ?? traduction.tr('serveurDeconnecte')),
+                      textAlign: TextAlign.center,
                     ),
+                  ),
+                  if (!estEnLigne)
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () => context.read<ZonesProvider>().chargerDepuisApi(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Réessayer'),
+                      ),
+                    ),
+                ],
+              ))
+                  : LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth >= 600) {
+                    return GridView.builder(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 2.8,
+                      ),
+                      itemCount: zonesAffichees.length,
+                      itemBuilder: (context, index) => _carte(context, zonesAffichees[index]),
+                    );
+                  }
+                  return ListView.separated(
+                    padding: const EdgeInsets.only(bottom: 80),
+                    itemCount: zonesAffichees.length,
+                    separatorBuilder: (context, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) => _carte(context, zonesAffichees[index]),
+                  );
+                },
+              ),
             ),
           ],
         ),

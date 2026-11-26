@@ -12,6 +12,7 @@ import 'package:agrismart/providers/planification_provider.dart';
 import 'package:agrismart/providers/traduction_provider.dart';
 import 'package:agrismart/screens/auth_gate.dart';
 import 'package:agrismart/services/auth_locale_service.dart';
+import 'package:agrismart/services/api_service.dart';
 import 'package:agrismart/services/auth_service.dart';
 import 'package:agrismart/services/firebase_auth_service.dart';
 import 'package:agrismart/services/traduction_service.dart';
@@ -40,15 +41,23 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
+        // Une seule instance : elle garde le token JWT du backend
+        Provider<ApiService>(
+          create: (_) => ApiService(),
+          dispose: (_, api) => api.dispose(),
+        ),
         ChangeNotifierProvider(create: (_) => AuthProvider(authService)),
         ChangeNotifierProvider(create: (_) => ReglagesProvider(prefs)),
         // L'AuthProvider doit être déclaré AVANT le ZonesProvider
         ChangeNotifierProvider(
-          create: (context) => ZonesProvider(prefs, context.read<AuthProvider>()),
+          create: (context) => ZonesProvider(
+            context.read<ApiService>(),
+            context.read<AuthProvider>(),
+          ),
         ),
         ChangeNotifierProxyProvider<ZonesProvider, PlanificationProvider>(
           create: (context) => PlanificationProvider(
-            prefs,
+            context.read<ApiService>(),
             context.read<AuthProvider>(),
             zonesProvider: context.read<ZonesProvider>(),
           ),

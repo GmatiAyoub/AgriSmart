@@ -21,19 +21,12 @@ class Vanne {
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      if (id != null) 'id': id,
-      'nom': nom,
-      'estOuverte': estOuverte,
-    };
-  }
-
+  /// Le backend envoie `etat: "ouverte" | "fermee"`.
   factory Vanne.fromJson(Map<String, dynamic> json) {
     return Vanne(
-      nom: (json['nom'] ?? json['name'] ?? '').toString(),
-      estOuverte: (json['estOuverte'] ?? json['isOpen'] ?? json['vanneOuverte'] ?? false) as bool,
-      id: (json['id'] ?? json['_id'])?.toString(),
+      id: json['id']?.toString(),
+      nom: (json['nom'] ?? '').toString(),
+      estOuverte: json['etat'] == 'ouverte',
     );
   }
 }

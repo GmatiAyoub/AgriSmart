@@ -1,39 +1,40 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:agrismart/config.dart';
-import 'package:agrismart/data/jeu_de_donnees.dart';
 import 'package:agrismart/models/vanne.dart';
 import 'package:agrismart/models/zone.dart';
 import 'package:agrismart/providers/auth_provider.dart';
 import 'package:agrismart/services/api_service.dart';
 
+/// Zones (parcelles) et vannes.
+/// Le backend est la seule source de vérité : rien n'est stocké sur le téléphone.
+/// Chaque action est envoyée au serveur, puis la liste est rechargée depuis le serveur.
+///
+/// Les actions retournent `null` si tout s'est bien passé, sinon le message d'erreur à afficher.
 class ZonesProvider extends ChangeNotifier {
-  final SharedPreferences _prefs;
+  // Les planifications tournent côté serveur : on se resynchronise régulièrement
+  // pour voir les vannes s'ouvrir et se fermer toutes seules.
+  static const Duration _intervalleActualisation = Duration(seconds: 15);
+
+  final ApiService _api;
   final AuthProvider _auth;
-  final ApiService _apiService;
 
   final List<Zone> _zones = [];
-  String? _uid; // utilisateur dont on affiche les zones
+  String? _uid;
+  Timer? _timer;
+  int _generation = 0; // sert à ignorer les réponses devenues obsolètes
 
   bool _estEnChargement = false;
-  String? _derniereErreur;
   bool _estEnLigneRest = false;
+  String? _derniereErreur;
+  bool _seulementAIrriguer = false;
 
-  ZonesProvider(this._prefs, this._auth, {ApiService? apiService})
-      : _apiService = apiService ?? ApiService() {
+  ZonesProvider(this._api, this._auth) {
     _auth.addListener(_surChangementUtilisateur);
-    _actualiser(); // charge d'abord les zones locales puis tente la synchro REST
+    _actualiser();
   }
 
-  // États d'affichage et synchro REST
-  bool _seulementAIrriguer = false;
-  bool get seulementAIrriguer => _seulementAIrriguer;
-  bool get estEnChargement => _estEnChargement;
-  String? get derniereErreur => _derniereErreur;
-  bool get estEnLigneRest => _estEnLigneRest;
+  // ---------- Lecture ----------
 
-  // Toutes les zones (lecture seule)
   List<Zone> get zones => List.unmodifiable(_zones);
 
   List<Zone> get zonesAffichees => _seulementAIrriguer
@@ -43,8 +44,13 @@ class ZonesProvider extends ChangeNotifier {
   int get nombre => _zones.length;
   int get nombreAIrriguer => _zones.where((z) => z.besoinIrrigation).length;
 
+  bool get seulementAIrriguer => _seulementAIrriguer;
+  bool get estEnChargement => _estEnChargement;
+  bool get estEnLigneRest => _estEnLigneRest;
+  String? get derniereErreur => _derniereErreur;
+
   List<String> noms({Zone? sauf}) {
-    return _zones.where((z) => z != sauf).map((z) => z.nom).toList();
+    return _zones.where((z) => sauf == null || z.id != sauf.id).map((z) => z.nom).toList();
   }
 
   void basculerFiltre() {
@@ -52,281 +58,145 @@ class ZonesProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---------- Stockage local et synchronisation REST ----------
+  // ---------- Cycle de vie / utilisateur ----------
 
-  String _cle(String uid) => 'zones_$uid';
-
-  List<Zone> _lireLocal(String uid) {
-    final texte = _prefs.getString(_cle(uid));
-    if (texte == null) return jeuDeDonnees();
-    try {
-      final liste = jsonDecode(texte) as List<dynamic>;
-      return liste
-          .map((e) => Zone.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return jeuDeDonnees();
-    }
-  }
-
-  void _sauvegarderLocal() {
-    final uid = _uid;
-    if (uid == null) return;
-    final texte = jsonEncode(_zones.map((z) => z.toJson()).toList());
-    _prefs.setString(_cle(uid), texte);
-  }
-
-  /// Charge les zones depuis l'API REST Node.js [GET /api/zones]
-  Future<void> chargerDepuisApi() async {
-    if (!utiliserBackendRest) return;
-
-    _estEnChargement = true;
-    _derniereErreur = null;
-    notifyListeners();
-
-    try {
-      final zonesApi = await _apiService.getZones();
-      if (zonesApi.isNotEmpty) {
-        _zones.clear();
-        _zones.addAll(zonesApi);
-        _estEnLigneRest = true;
-        _sauvegarderLocal();
-      }
-    } on ApiException catch (e) {
-      _derniereErreur = e.message;
-      _estEnLigneRest = false;
-    } catch (e) {
-      _derniereErreur = 'Erreur lors de la synchronisation: $e';
-      _estEnLigneRest = false;
-    } finally {
-      _estEnChargement = false;
-      notifyListeners();
-    }
+  void _surChangementUtilisateur() {
+    if (_actualiser()) notifyListeners();
   }
 
   bool _actualiser() {
     final uid = _auth.utilisateur?.uid;
     if (uid == _uid) return false;
     _uid = uid;
+
+    _generation++; // invalide les chargements en cours
+    _timer?.cancel();
     _zones.clear();
-    if (uid != null) {
-      _zones.addAll(_lireLocal(uid));
+    _derniereErreur = null;
+    _estEnLigneRest = false;
+
+    if (uid == null) {
+      _estEnChargement = false;
+      _api.deconnecter();
+    } else {
       chargerDepuisApi();
+      _timer = Timer.periodic(
+        _intervalleActualisation,
+            (_) => chargerDepuisApi(silencieux: true),
+      );
     }
     return true;
   }
 
-  void _surChangementUtilisateur() {
-    if (_actualiser()) notifyListeners();
-  }
-
   @override
   void dispose() {
+    _timer?.cancel();
     _auth.removeListener(_surChangementUtilisateur);
     super.dispose();
   }
 
-  // ---------- Actions CRUD & Gestion des Vannes ----------
+  // ---------- Chargement ----------
 
-  /// Ouvre ou ferme toutes les vannes d'une parcelle (Bouton "Irriguer")
-  Future<void> irriguerParcelle(Zone zone) async {
-    final index = _zones.indexOf(zone);
-    if (index == -1) return;
+  /// Recharge les zones depuis le serveur.
+  /// [silencieux] : pas d'indicateur de chargement (actualisation automatique).
+  Future<void> chargerDepuisApi({bool silencieux = false}) async {
+    if (_auth.utilisateur == null) return;
 
-    final nouvelleValeur = !zone.auMoinsUneVanneOuverte;
-    final nouvellesVannes = zone.vannes
-        .map((v) => v.copyWith(estOuverte: nouvelleValeur))
-        .toList();
-
-    final zoneModifiee = zone.copyWith(vannes: nouvellesVannes);
-    _zones[index] = zoneModifiee;
-    _sauvegarderLocal();
-    notifyListeners();
-
-    if (utiliserBackendRest && zone.id != null) {
-      try {
-        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
-        _zones[index] = reponse;
-        _sauvegarderLocal();
-        notifyListeners();
-      } catch (e) {
-        _derniereErreur = e.toString();
-      }
-    }
-  }
-
-  /// Bascule l'état d'une vanne spécifique dans une parcelle
-  Future<void> basculerVanne(Zone zone, int vanneIndex) async {
-    final index = _zones.indexOf(zone);
-    if (index == -1 || vanneIndex < 0 || vanneIndex >= zone.vannes.length) return;
-
-    final v = zone.vannes[vanneIndex];
-    final vannesModifiees = List<Vanne>.from(zone.vannes);
-    vannesModifiees[vanneIndex] = v.copyWith(estOuverte: !v.estOuverte);
-
-    final zoneModifiee = zone.copyWith(vannes: vannesModifiees);
-    _zones[index] = zoneModifiee;
-    _sauvegarderLocal();
-    notifyListeners();
-
-    if (utiliserBackendRest && zone.id != null) {
-      try {
-        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
-        _zones[index] = reponse;
-        _sauvegarderLocal();
-        notifyListeners();
-      } catch (e) {
-        _derniereErreur = e.toString();
-      }
-    }
-  }
-
-  /// Ajoute une nouvelle vanne dans une zone
-  Future<void> ajouterVanne(Zone zone, Vanne nouvelleVanne) async {
-    final index = _zones.indexOf(zone);
-    if (index == -1) return;
-
-    final vannesModifiees = List<Vanne>.from(zone.vannes)..add(nouvelleVanne);
-    final zoneModifiee = zone.copyWith(vannes: vannesModifiees);
-    _zones[index] = zoneModifiee;
-    _sauvegarderLocal();
-    notifyListeners();
-
-    if (utiliserBackendRest && zone.id != null) {
-      try {
-        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
-        _zones[index] = reponse;
-        _sauvegarderLocal();
-        notifyListeners();
-      } catch (e) {
-        _derniereErreur = e.toString();
-      }
-    }
-  }
-
-  /// Modifie une vanne existante dans une zone
-  Future<void> modifierVanne(Zone zone, int vanneIndex, Vanne vanneModifiee) async {
-    final index = _zones.indexOf(zone);
-    if (index == -1 || vanneIndex < 0 || vanneIndex >= zone.vannes.length) return;
-
-    final vannesModifiees = List<Vanne>.from(zone.vannes);
-    vannesModifiees[vanneIndex] = vanneModifiee;
-
-    final zoneModifiee = zone.copyWith(vannes: vannesModifiees);
-    _zones[index] = zoneModifiee;
-    _sauvegarderLocal();
-    notifyListeners();
-
-    if (utiliserBackendRest && zone.id != null) {
-      try {
-        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
-        _zones[index] = reponse;
-        _sauvegarderLocal();
-        notifyListeners();
-      } catch (e) {
-        _derniereErreur = e.toString();
-      }
-    }
-  }
-
-  /// Supprime une vanne d'une zone
-  Future<void> supprimerVanne(Zone zone, int vanneIndex) async {
-    final index = _zones.indexOf(zone);
-    if (index == -1 || vanneIndex < 0 || vanneIndex >= zone.vannes.length) return;
-
-    final vannesModifiees = List<Vanne>.from(zone.vannes)..removeAt(vanneIndex);
-    final zoneModifiee = zone.copyWith(vannes: vannesModifiees);
-    _zones[index] = zoneModifiee;
-    _sauvegarderLocal();
-    notifyListeners();
-
-    if (utiliserBackendRest && zone.id != null) {
-      try {
-        final reponse = await _apiService.modifierZone(zone.id!, zoneModifiee);
-        _zones[index] = reponse;
-        _sauvegarderLocal();
-        notifyListeners();
-      } catch (e) {
-        _derniereErreur = e.toString();
-      }
-    }
-  }
-
-  /// Modifie l'humidité d'une zone [PATCH /api/zones/:id]
-  Future<void> modifierHumidite(Zone zone, double delta) async {
-    final index = _zones.indexOf(zone);
-    if (index == -1) return;
-
-    final nouvelleHumidite = (zone.humidite + delta).clamp(0, 100).toDouble();
-    zone.humidite = nouvelleHumidite;
-    _sauvegarderLocal();
-    notifyListeners();
-
-    if (utiliserBackendRest && zone.id != null) {
-      try {
-        await _apiService.patchZone(zone.id!, {'humidite': nouvelleHumidite});
-      } catch (e) {
-        _derniereErreur = e.toString();
-      }
-    }
-  }
-
-  /// Ajoute une nouvelle zone [POST /api/zones]
-  Future<void> ajouter(Zone zone) async {
-    _zones.add(zone);
-    _sauvegarderLocal();
-    notifyListeners();
-
-    if (utiliserBackendRest) {
-      try {
-        final zoneCreee = await _apiService.ajouterZone(zone);
-        final index = _zones.indexOf(zone);
-        if (index != -1) {
-          _zones[index] = zoneCreee;
-          _sauvegarderLocal();
-          notifyListeners();
-        }
-      } catch (e) {
-        _derniereErreur = e.toString();
-      }
-    }
-  }
-
-  /// Remplace/Modifie une zone [PUT /api/zones/:id]
-  Future<void> remplacer(Zone ancienne, Zone nouvelle) async {
-    final index = _zones.indexOf(ancienne);
-    if (index != -1) {
-      _zones[index] = nouvelle;
-      _sauvegarderLocal();
+    final generation = ++_generation;
+    if (!silencieux) {
+      _estEnChargement = true;
       notifyListeners();
+    }
 
-      if (utiliserBackendRest && (nouvelle.id != null || ancienne.id != null)) {
-        final id = nouvelle.id ?? ancienne.id!;
-        try {
-          final reponse = await _apiService.modifierZone(id, nouvelle);
-          _zones[index] = reponse;
-          _sauvegarderLocal();
-          notifyListeners();
-        } catch (e) {
-          _derniereErreur = e.toString();
-        }
+    try {
+      final zones = await _api.getZones();
+      if (generation != _generation) return;
+      _zones
+        ..clear()
+        ..addAll(zones);
+      _estEnLigneRest = true;
+      _derniereErreur = null;
+    } on ApiException catch (e) {
+      if (generation != _generation) return;
+      _estEnLigneRest = false;
+      _derniereErreur = e.message;
+    } catch (_) {
+      if (generation != _generation) return;
+      _estEnLigneRest = false;
+      _derniereErreur = 'Erreur lors de la synchronisation';
+    } finally {
+      if (generation == _generation) {
+        _estEnChargement = false;
+        notifyListeners();
       }
     }
   }
 
-  /// Supprime une zone [DELETE /api/zones/:id]
-  Future<void> supprimer(Zone zone) async {
+  /// Exécute une action sur le serveur puis recharge. Retourne le message d'erreur, ou null.
+  Future<String?> _executer(Future<void> Function() action) async {
+    String? erreur;
+    try {
+      await action();
+    } on ApiException catch (e) {
+      erreur = e.message;
+    } catch (_) {
+      erreur = 'Une erreur est survenue';
+    }
+    await chargerDepuisApi(silencieux: true);
+    return erreur;
+  }
+
+  // ---------- Zones ----------
+
+  Future<String?> ajouter(Zone zone) => _executer(() => _api.creerZone(zone));
+
+  /// Modifie les champs de la parcelle (nom, culture, seuil...). Les vannes ne sont pas touchées.
+  Future<String?> remplacer(Zone ancienne, Zone nouvelle) {
+    final id = nouvelle.id ?? ancienne.id;
+    if (id == null) return Future.value('Zone sans identifiant');
+    return _executer(() => _api.modifierZone(id, nouvelle));
+  }
+
+  Future<String?> supprimer(Zone zone) {
     final id = zone.id;
-    _zones.remove(zone);
-    _sauvegarderLocal();
-    notifyListeners();
-
-    if (utiliserBackendRest && id != null) {
-      try {
-        await _apiService.supprimerZone(id);
-      } catch (e) {
-        _derniereErreur = e.toString();
-      }
-    }
+    if (id == null) return Future.value('Zone sans identifiant');
+    return _executer(() => _api.supprimerZone(id));
   }
+
+  // ---------- Vannes ----------
+
+  /// Bouton « Irriguer » : ouvre toutes les vannes de la parcelle, ou les ferme si l'une est ouverte.
+  Future<String?> irriguerParcelle(Zone zone) {
+    final id = zone.id;
+    if (id == null) return Future.value('Zone sans identifiant');
+    if (zone.vannes.isEmpty) return Future.value("Cette parcelle n'a aucune vanne");
+    return _executer(() => _api.irriguer(id, !zone.auMoinsUneVanneOuverte));
+  }
+
+  Future<String?> basculerVanne(Zone zone, int vanneIndex) {
+    final vanne = _vanne(zone, vanneIndex);
+    if (vanne?.id == null) return Future.value('Vanne introuvable');
+    return _executer(() => _api.commanderVanne(vanne!.id!, !vanne.estOuverte));
+  }
+
+  Future<String?> ajouterVanne(Zone zone, Vanne nouvelleVanne) {
+    final id = zone.id;
+    if (id == null) return Future.value('Zone sans identifiant');
+    return _executer(() => _api.creerVanne(id, nouvelleVanne.nom));
+  }
+
+  Future<String?> modifierVanne(Zone zone, int vanneIndex, Vanne vanneModifiee) {
+    final vanne = _vanne(zone, vanneIndex);
+    if (vanne?.id == null) return Future.value('Vanne introuvable');
+    return _executer(() => _api.renommerVanne(vanne!.id!, vanneModifiee.nom));
+  }
+
+  Future<String?> supprimerVanne(Zone zone, int vanneIndex) {
+    final vanne = _vanne(zone, vanneIndex);
+    if (vanne?.id == null) return Future.value('Vanne introuvable');
+    return _executer(() => _api.supprimerVanne(vanne!.id!));
+  }
+
+  Vanne? _vanne(Zone zone, int index) =>
+      index >= 0 && index < zone.vannes.length ? zone.vannes[index] : null;
 }

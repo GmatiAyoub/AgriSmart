@@ -16,13 +16,15 @@ class PlanificationPage extends StatelessWidget {
 
   String _libelleRepetition(RepetitionIrrigation r, TraductionProvider traduction) {
     switch (r) {
-      case RepetitionIrrigation.uneFois:
-        return traduction.tr('uneFois');
       case RepetitionIrrigation.quotidienne:
         return traduction.tr('quotidienne');
       case RepetitionIrrigation.hebdomadaire:
         return traduction.tr('hebdomadaire');
     }
+  }
+
+  void _message(BuildContext context, String texte) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
   }
 
   Future<void> _ajouter(BuildContext context) async {
@@ -31,10 +33,10 @@ class PlanificationPage extends StatelessWidget {
       MaterialPageRoute(builder: (_) => const PlanificationFormPage()),
     );
     if (nouvelle == null || !context.mounted) return;
-    context.read<PlanificationProvider>().ajouter(nouvelle);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.read<TraductionProvider>().tr('planificationAjoutee'))),
-    );
+    final traduction = context.read<TraductionProvider>();
+    final erreur = await context.read<PlanificationProvider>().ajouter(nouvelle);
+    if (!context.mounted) return;
+    _message(context, erreur ?? traduction.tr('planificationAjoutee'));
   }
 
   Future<void> _modifier(BuildContext context, PlanificationIrrigation item) async {
@@ -43,10 +45,10 @@ class PlanificationPage extends StatelessWidget {
       MaterialPageRoute(builder: (_) => PlanificationFormPage(planification: item)),
     );
     if (modifiee == null || !context.mounted) return;
-    context.read<PlanificationProvider>().modifier(item, modifiee);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.read<TraductionProvider>().tr('planificationModifiee'))),
-    );
+    final traduction = context.read<TraductionProvider>();
+    final erreur = await context.read<PlanificationProvider>().modifier(item, modifiee);
+    if (!context.mounted) return;
+    _message(context, erreur ?? traduction.tr('planificationModifiee'));
   }
 
   Future<void> _supprimer(BuildContext context, PlanificationIrrigation item) async {
@@ -63,10 +65,9 @@ class PlanificationPage extends StatelessWidget {
       ),
     );
     if (confirme != true || !context.mounted) return;
-    context.read<PlanificationProvider>().supprimer(item);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(traduction.tr('planificationSupprimee'))),
-    );
+    final erreur = await context.read<PlanificationProvider>().supprimer(item);
+    if (!context.mounted) return;
+    _message(context, erreur ?? traduction.tr('planificationSupprimee'));
   }
 
   @override
@@ -126,131 +127,136 @@ class PlanificationPage extends StatelessWidget {
           Expanded(
             child: list.isEmpty
                 ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.calendar_month_outlined, size: 64, color: Colors.grey),
+                  const SizedBox(height: 12),
+                  Text(
+                    traduction.tr('aucunePlanification'),
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            )
+                : ListView.builder(
+              padding: const EdgeInsets.only(bottom: 80, top: 8),
+              itemCount: list.length,
+              itemBuilder: (context, index) {
+                final item = list[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.calendar_month_outlined, size: 64, color: Colors.grey),
-                        const SizedBox(height: 12),
-                        Text(
-                          traduction.tr('aucunePlanification'),
-                          style: const TextStyle(color: Colors.grey),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: item.estActive
+                                  ? Colors.green.withValues(alpha: 0.2)
+                                  : Colors.grey.withValues(alpha: 0.2),
+                              child: Icon(
+                                Icons.water_drop,
+                                color: item.estActive ? Colors.green : Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          item.zoneNom,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          '${item.dureeMinutes} min',
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                                      const SizedBox(width: 4),
+                                      Text(_formaterDate(item.dateHeure), style: const TextStyle(fontSize: 13)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '(${_libelleRepetition(item.repetition, traduction)})',
+                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Switch(
+                                  value: item.estActive,
+                                  onChanged: (_) async {
+                                    final erreur = await provider.basculerEtat(item);
+                                    if (erreur != null && context.mounted) {
+                                      _message(context, erreur);
+                                    }
+                                  },
+                                ),
+                                Text(
+                                  item.estActive ? traduction.tr('actives') : 'Inactif',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: item.estActive ? Colors.green : Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 20),
+                                  tooltip: traduction.tr('modifierPlanification'),
+                                  onPressed: () => _modifier(context, item),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                  tooltip: traduction.tr('supprimerPlanification'),
+                                  onPressed: () => _supprimer(context, item),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 80, top: 8),
-                    itemCount: list.length,
-                    itemBuilder: (context, index) {
-                      final item = list[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: item.estActive
-                                        ? Colors.green.withValues(alpha: 0.2)
-                                        : Colors.grey.withValues(alpha: 0.2),
-                                    child: Icon(
-                                      Icons.water_drop,
-                                      color: item.estActive ? Colors.green : Colors.grey,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                item.zoneNom,
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: Colors.blue.withValues(alpha: 0.15),
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: Text(
-                                                '${item.dureeMinutes} min',
-                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.access_time, size: 14, color: Colors.grey),
-                                            const SizedBox(width: 4),
-                                            Text(_formaterDate(item.dateHeure), style: const TextStyle(fontSize: 13)),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                '(${_libelleRepetition(item.repetition, traduction)})',
-                                                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Divider(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Switch(
-                                        value: item.estActive,
-                                        onChanged: (_) => provider.basculerEtat(item),
-                                      ),
-                                      Text(
-                                        item.estActive ? traduction.tr('actives') : 'Inactif',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: item.estActive ? Colors.green : Colors.grey,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, size: 20),
-                                        tooltip: traduction.tr('modifierPlanification'),
-                                        onPressed: () => _modifier(context, item),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                                        tooltip: traduction.tr('supprimerPlanification'),
-                                        onPressed: () => _supprimer(context, item),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
                   ),
+                );
+              },
+            ),
           ),
         ],
       ),

@@ -9,17 +9,17 @@ class Zone {
   final List<Vanne> vannes;
 
   Zone(
-    this.nom,
-    this.culture,
-    this.humidite,
-    this.seuil, {
-    this.id,
-    List<Vanne>? vannes,
-    bool vanneOuverte = false,
-  }) : vannes = vannes ??
-            [
-              Vanne(nom: 'Vanne 1', estOuverte: vanneOuverte),
-            ];
+      this.nom,
+      this.culture,
+      this.humidite,
+      this.seuil, {
+        this.id,
+        List<Vanne>? vannes,
+        bool vanneOuverte = false,
+      }) : vannes = vannes ??
+      [
+        Vanne(nom: 'Vanne 1', estOuverte: vanneOuverte),
+      ];
 
   bool get besoinIrrigation => humidite < seuil;
   bool get auMoinsUneVanneOuverte => vannes.any((v) => v.estOuverte);
@@ -46,42 +46,22 @@ class Zone {
     );
   }
 
-  // Conversion en JSON (pour l'enregistrer sur l'appareil ou l'envoyer au backend REST)
-  Map<String, dynamic> toJson() {
-    return {
-      if (id != null) 'id': id,
-      'nom': nom,
-      'culture': culture,
-      'humidite': humidite,
-      'seuil': seuil,
-      'vannes': vannes.map((v) => v.toJson()).toList(),
-      'vanneOuverte': auMoinsUneVanneOuverte,
-    };
-  }
-
-  // Reconstruit une zone à partir d'un JSON (Support MongoDB _id & Node.js REST API keys)
+  /// Reconstruit une zone (parcelle) à partir de la réponse du backend.
+  /// Les vannes sont ajoutées à part (voir ApiService.getZones).
   factory Zone.fromJson(Map<String, dynamic> json) {
-    List<Vanne> listeVannes = [];
-    if (json['vannes'] != null && json['vannes'] is List) {
-      listeVannes = (json['vannes'] as List)
-          .map((v) => Vanne.fromJson(v as Map<String, dynamic>))
-          .toList();
-    }
-
-    final bool estOuverteBase =
-        (json['vanneOuverte'] ?? json['isValveOpen'] ?? json['vanne_ouverte'] ?? false) as bool;
-
-    if (listeVannes.isEmpty) {
-      listeVannes = [Vanne(nom: 'Vanne 1', estOuverte: estOuverteBase)];
-    }
+    final vannes = json['vannes'] is List
+        ? (json['vannes'] as List)
+        .map((v) => Vanne.fromJson(v as Map<String, dynamic>))
+        .toList()
+        : <Vanne>[];
 
     return Zone(
-      (json['nom'] ?? json['name'] ?? '').toString(),
-      (json['culture'] ?? json['crop'] ?? '').toString(),
-      ((json['humidite'] ?? json['humidity'] ?? 0) as num).toDouble(),
-      ((json['seuil'] ?? json['threshold'] ?? 0) as num).toDouble(),
-      id: (json['id'] ?? json['_id'])?.toString(),
-      vannes: listeVannes,
+      (json['nom'] ?? '').toString(),
+      (json['culture'] ?? '').toString(),
+      ((json['humidite'] ?? 0) as num).toDouble(),
+      ((json['seuil'] ?? 0) as num).toDouble(),
+      id: json['id']?.toString(),
+      vannes: vannes,
     );
   }
 }
