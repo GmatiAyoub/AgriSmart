@@ -87,7 +87,7 @@ class ApiService {
       // Token expiré (8 h) : on se reconnecte une fois, puis on rejoue la requête
       if (reponse.statusCode == 401 && authentifie && nouvelEssai) {
         _token = null;
-        return _requete(methode, chemin, corps: corps, nouvelEssai: false);
+        return await _requete(methode, chemin, corps: corps, nouvelEssai: false);
       }
       return _traiter(reponse);
     } on ApiException {

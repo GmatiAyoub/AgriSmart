@@ -8,6 +8,7 @@ import 'package:agrismart/providers/planification_provider.dart';
 import 'package:agrismart/providers/reglages_provider.dart';
 import 'package:agrismart/providers/meteo_provider.dart';
 import 'package:agrismart/providers/traduction_provider.dart';
+import 'package:agrismart/services/api_service.dart';
 import 'package:agrismart/services/auth_locale_service.dart';
 import 'package:agrismart/services/traduction_service.dart';
 
@@ -17,18 +18,23 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     final authService = AuthLocaleService();
     final traductionService = TraductionService();
+    final apiService = ApiService();
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          Provider<ApiService>(create: (_) => apiService),
           ChangeNotifierProvider(create: (_) => AuthProvider(authService)),
           ChangeNotifierProvider(create: (_) => ReglagesProvider(prefs)),
           ChangeNotifierProvider(
-            create: (context) => ZonesProvider(prefs, context.read<AuthProvider>()),
+            create: (context) => ZonesProvider(
+              context.read<ApiService>(),
+              context.read<AuthProvider>(),
+            ),
           ),
           ChangeNotifierProxyProvider<ZonesProvider, PlanificationProvider>(
             create: (context) => PlanificationProvider(
-              prefs,
+              context.read<ApiService>(),
               context.read<AuthProvider>(),
               zonesProvider: context.read<ZonesProvider>(),
             ),

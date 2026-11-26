@@ -35,7 +35,8 @@ class ZoneDetailPage extends StatelessWidget {
     );
 
     if (nouvelle == null || !context.mounted) return;
-    _signaler(context, await context.read<ZonesProvider>().remplacer(zoneActuelle, nouvelle));
+    final res = await context.read<ZonesProvider>().remplacer(zoneActuelle, nouvelle);
+    if (context.mounted) _signaler(context, res);
   }
 
   Future<void> _dialogVanne(BuildContext context, Zone zoneActuelle, {Vanne? vanneExistante, int? index}) async {
