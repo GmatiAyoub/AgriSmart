@@ -1,0 +1,3 @@
+# argon2 compiles a native module on install: pnpm needs to be told this is allowed
+onlyBuiltDependencies:
+  - argon2
